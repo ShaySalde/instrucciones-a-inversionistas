@@ -1776,17 +1776,15 @@ function fmtCOP(n){
 function buildEmailDraft(investorName, count, total){
   const today = new Date();
   const fecha = today.toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" });
-  const subject = "Reporte de operaciones – " + investorName + " – " + fecha;
+  const subject = "Instrucción traslado de recursos / PA LIQUITECH SKANDIA – " + investorName + " – " + fecha;
   const body =
 `Estimado(a) ${investorName},
 
-Adjunto el reporte detallado de sus operaciones con corte al ${fecha}: ${count} operación(es) por un total de ${fmtCOP(total)}.
+Adjunto encontrará el reporte de los pagos aplicados a su favor con corte al ${fecha}, por un total de ${fmtCOP(total)}.
 
 Quedamos atentos a cualquier inquietud.
 
-Cordialmente,
-Área de Tesorería
-Liquitech S.A.S`;
+Cordialmente,`;
   return { subject, body };
 }
 
