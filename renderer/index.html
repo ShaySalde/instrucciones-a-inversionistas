@@ -251,6 +251,62 @@
   .inv-siigo .siigo-tag{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:-.01em}
   .inv-siigo .btn{padding:7px 13px;font-size:12.5px}
   .inv-siigo input:focus-visible{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--ring)}
+
+  /* ===== Pestañas principales (Configuración / Operación) ===== */
+  .nav-tabs{display:flex;gap:6px;margin:0 0 18px;background:var(--surface);border:1px solid var(--hairline);
+    border-radius:13px;padding:5px;box-shadow:var(--shadow-sm)}
+  .nav-tab{flex:1;background:transparent;border:0;cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;
+    color:var(--muted);padding:11px 14px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+  .nav-tab:hover{color:var(--ink)}
+  .nav-tab.active{color:#fff;background:var(--grad-brand);box-shadow:0 8px 18px -8px rgba(119,92,248,.6)}
+  .nav-tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .nav-panel{display:none}
+  .nav-panel.active{display:block;animation:cardIn .4s cubic-bezier(.22,1,.36,1) both}
+
+  /* ===== Directorio de inversionistas ===== */
+  .dir-toolbar{display:flex;align-items:center;gap:10px;margin:2px 0 12px;flex-wrap:wrap}
+  .dir-search{flex:1;min-width:180px;border:1px solid var(--hairline);border-radius:10px;padding:9px 12px;
+    font-family:inherit;font-size:13px;color:var(--ink);background:#fff}
+  .dir-empty{color:var(--muted);font-size:13px;font-style:italic;padding:10px 2px}
+  .dir-item{border:1px solid var(--hairline);border-radius:13px;padding:14px 15px;margin-top:11px;
+    background:linear-gradient(180deg,#fff,#fbfaff);box-shadow:var(--shadow-sm);transition:box-shadow .18s,border-color .18s}
+  .dir-item:hover{box-shadow:var(--shadow-md);border-color:#e4dffb}
+  .dir-item.flash{border-color:var(--accent);box-shadow:0 0 0 2px var(--ring),var(--shadow-md)}
+  .dir-grid{display:grid;grid-template-columns:190px 1fr;gap:14px;align-items:start}
+  @media (max-width:640px){ .dir-grid{grid-template-columns:1fr} }
+  .dir-field{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:10px}
+  .dir-field input{display:block;width:100%;margin-top:4px;border:1px solid var(--hairline);border-radius:9px;
+    padding:9px 11px;font-family:inherit;font-size:13px;color:var(--ink);background:#fff}
+  .dir-field input[readonly]{background:#f4f5f9;color:var(--muted)}
+  .dir-accts{display:flex;gap:10px;flex-wrap:wrap}
+  .dir-accts .dir-field{flex:1;min-width:130px;margin-bottom:0}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+  .chip-mail{display:inline-flex;align-items:center;gap:6px;background:var(--tint);color:var(--ink);
+    border:1px solid var(--tint-line);border-radius:999px;padding:4px 6px 4px 11px;font-size:12px;font-variant-numeric:tabular-nums}
+  .chip-mail button{border:0;background:#ded7fb;color:#5b46c9;width:17px;height:17px;border-radius:50%;cursor:pointer;
+    font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .chip-mail button:hover{background:#cbc0f6}
+  .add-email{display:flex;gap:7px;align-items:center}
+  .add-email input{flex:1;min-width:0;border:1px solid var(--hairline);border-radius:9px;padding:8px 11px;
+    font-family:inherit;font-size:13px;color:var(--ink);background:#fff}
+  .add-email .btn{padding:8px 12px;font-size:12.5px}
+  .dir-item .dir-actions{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .dir-item .dir-state{font-size:12px;font-weight:600}
+  .btn.danger{background:#ffe6e6;color:#a02b2b}
+  .btn.danger:hover:not(:disabled){background:#ffd6d6}
+
+  /* ===== Datos de solo lectura en tarjetas de envío ===== */
+  .inv-card .inv-email .inv-label{font-size:12px;color:var(--muted);white-space:nowrap;font-weight:500}
+  .inv-emails-ro{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+  .ro-chip{background:var(--tint);color:var(--ink);border:1px solid var(--tint-line);border-radius:999px;
+    padding:3px 11px;font-size:12px;font-variant-numeric:tabular-nums}
+  .ro-acct{font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .ro-missing{font-size:12.5px;color:var(--err);font-weight:500}
+  .linklike{border:0;background:transparent;color:var(--accent);cursor:pointer;font-family:inherit;font-size:12px;
+    font-weight:600;padding:2px 4px;border-radius:6px}
+  .linklike:hover{text-decoration:underline}
+  .linklike:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
 </style>
 </head>
 <body>
@@ -265,12 +321,19 @@
     </div>
   </header>
 
+  <nav class="nav-tabs" role="tablist">
+    <button class="nav-tab active" data-panel="panelConfig" role="tab">⚙ Configuración</button>
+    <button class="nav-tab" data-panel="panelApp" role="tab">▶ Operación</button>
+  </nav>
+
+  <div class="nav-panel active" id="panelConfig" role="tabpanel">
+
   <section class="card" id="cardMail">
     <h2>⚙ Configuración de correo (Gmail)</h2>
     <p style="color:var(--muted);font-size:12.5px;margin:-2px 0 12px">
       Necesario solo para <b>enviar</b> los reportes. Usa una <b>contraseña de aplicación</b> de Google
       (requiere verificación en 2 pasos activada). <a href="#" id="lnkAppPw">¿Cómo la genero?</a>
-      La contraseña se guarda <b>cifrada en este equipo</b> y solo se usa contra <code class="inline">smtp.gmail.com</code>.
+      La contraseña se guarda <b>cifrada en este equipo</b> y solo se usa para enviar tus correos por Gmail.
     </p>
     <div class="row" style="gap:16px;align-items:flex-start">
       <label style="flex:1;min-width:220px;display:block;font-size:12px;color:var(--muted)">Correo (remitente)
@@ -297,8 +360,8 @@
     <h2>🧾 Contabilidad · Siigo (opcional)</h2>
     <p style="color:var(--muted);font-size:12.5px;margin:-2px 0 12px">
       Registra en Siigo un <b>comprobante contable por inversionista</b> con su <b>monto total instruido</b>.
-      Requiere acceso API de Siigo. La <b>access key</b> se guarda <b>cifrada en este equipo</b> y solo se usa contra
-      <code class="inline">api.siigo.com</code>. Las cuentas débito/crédito de cada inversionista se configuran en su tarjeta, abajo.
+      Requiere acceso API de Siigo. La <b>access key</b> se guarda <b>cifrada en este equipo</b> y solo se usa para
+      conectarse con Siigo. Las cuentas débito/crédito de cada inversionista se configuran en el <b>directorio de inversionistas</b>, abajo.
     </p>
     <div class="row" style="gap:16px;align-items:flex-start">
       <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Usuario API
@@ -338,6 +401,24 @@
       <span class="status-pill" id="sgStatus">Sin configurar</span>
     </div>
   </section>
+
+  <section class="card" id="cardDirectory">
+    <h2>📇 Directorio de inversionistas</h2>
+    <p style="color:var(--muted);font-size:12.5px;margin:-2px 0 12px">
+      Guarda por inversionista sus <b>correos</b> (puedes agregar varios) y sus <b>cuentas contables de Siigo</b>.
+      Se usan automáticamente al enviar los reportes y al registrar en Siigo. Los inversionistas también se agregan solos
+      cuando procesas un archivo.
+    </p>
+    <div class="dir-toolbar">
+      <input type="text" id="dirSearch" class="dir-search" placeholder="Buscar por nombre o NIT…" autocomplete="off">
+      <button class="btn primary" id="btnAddInvestor">+ Agregar inversionista</button>
+    </div>
+    <div id="dirList"></div>
+  </section>
+
+  </div><!-- /panelConfig -->
+
+  <div class="nav-panel" id="panelApp" role="tabpanel">
 
   <section class="card">
     <h2>1 · Elige la operación</h2>
@@ -381,81 +462,7 @@
     <div id="individualList"></div>
   </section>
 
-  <section class="card" id="cardDetails">
-    <h2>¿Qué hace exactamente?</h2>
-    <div id="descLimpieza" style="display:none">
-      <p>Replica <b>Limpieza_Va6s_Excel</b> sobre la primera hoja del libro:</p>
-      <ol class="steps">
-        <li>Elimina columnas cuyo nombre no esté en la lista blanca (comparación sin tildes y en mayúsculas, réplica de <code class="inline">NormalizeStr</code>).</li>
-        <li>Reordena las restantes según el orden estricto del macro y estandariza sus nombres. Las que no estén en la lista van al final.</li>
-        <li>Genera <b>Tabla Inversionistas</b> con agregación por <i>Nombre Inversionista</i> e <i>Inversionista_beneficiario</i>, suma de las 4 métricas y fila <b>Total general</b>.</li>
-        <li>Aplica formato <code class="inline">$&nbsp;#,##0.00</code> a las columnas de sumas.</li>
-      </ol>
-    </div>
-    <div id="descDistribuir" style="display:none">
-      <p>Replica <b>DistribuirPaymentTape</b> — genera tres tipos de hojas en el libro:</p>
-      <ol class="steps">
-        <li>Busca la hoja fuente (aquella con <i>inversionista_beneficiario</i> o <i>owner_name</i> en la fila 1).</li>
-        <li>Mapea los headers del origen contra los <b>69 nombres canónicos</b> usando la función <code class="inline">NormKey</code> del macro (solo letras a-z y dígitos, todo lo demás — tildes, espacios, puntos — se elimina).</li>
-        <li><b>Recalcula "Fecha de liquidación"</b> = Fecha de compraventa + Días de liquidación (días calendario), sobrescribiendo el valor que traía el payment tape.</li>
-        <li>Crea la hoja <b>Base Distribuida</b> con las 69 columnas canónicas y todas las filas.</li>
-        <li>Crea la hoja <b>Tabla Inversionistas</b> (título en A1, headers en fila 3) con agrupación por <i>Inversionista_beneficiario</i>, ordenada descendente por <i>Total para inversionista</i>, con fila de <b>Total general</b>.</li>
-        <li>Crea la hoja <b>Instruccion</b>: replica el formato de tabla dinámica "Etiquetas de fila / Suma de Total para inversionista", agrupando por <i>Nombre Inversionista</i> (orden alfabético, en blanco al final) y desglosando por <i>Nombre fuente de fondeo</i> únicamente cuando un inversionista tiene más de una fuente distinta — igual que en el archivo de referencia. Las filas 14 en adelante (saldos a favor, márgenes, valor final a girar) no se generan porque dependen de datos externos al payment tape; quedan libres para completarlas a mano.</li>
-        <li>Crea una hoja <b>Det_&lt;inversionista&gt;</b> por cada inversionista, con las filas correspondientes y una fila de total (con fórmula <code class="inline">SUM</code>).</li>
-        <li>Aplica formato numérico: monto <code class="inline">#,##0.00;[Red](#,##0.00)</code>, tasa <code class="inline">0.00</code>, cantidad <code class="inline">#,##0</code>.</li>
-      </ol>
-    </div>
-    <div id="descIndividual" style="display:none">
-      <p>Genera un archivo Excel por cada <b>Nombre Inversionista</b>, listo para adjuntar en un correo:</p>
-      <ol class="steps">
-        <li>Usa la misma hoja fuente y mapeo de columnas que <b>Distribuir Payment Tape</b> (incluyendo el recálculo de <i>Fecha de liquidación</i> = Fecha de compraventa + Días de liquidación).</li>
-        <li>Filtra únicamente estas 18 columnas: <code class="inline">ID Deudor, Deudor, ID Emisor, Emisor, Tipo de Operación, No Pago, No. Factura, Fecha de liquidación, Estado del Pago, Nombre Inversionista, NIT inversionista, Fecha de compraventa, Días de liquidación, Tasa Inversionista, Valor Invertido, Fecha de compraventa ajustada, rendimientos2, Total para inversionista</code>.</li>
-        <li>Agrupa las filas por <i>Nombre Inversionista</i> y crea un libro <code class="inline">.xlsx</code> independiente por cada uno, con una fila <b>Total</b> al final (suma de <i>Total para inversionista</i>).</li>
-        <li>Para cada inversionista muestra una tarjeta con: campo de correo (se guarda en el <b>directorio por NIT</b> de este equipo para la próxima vez), botón <b>Enviar</b> (envía el reporte desde tu Gmail configurado con el <b>Excel ya adjunto</b>, sin pasos manuales), botón <b>Enviar a todos</b> para el lote completo, y botones para descargar el Excel o copiar el texto del correo.</li>
-        <li><b>Alerta de Fecha de liquidación:</b> compara cada operación contra la <i>fecha de referencia (envío)</i> — por defecto hoy, ajustable — y marca en ámbar las que se desvían <b>más de 1 día hábil</b> (excluyendo fines de semana y <b>festivos de Colombia</b>). Puedes <b>corregir la fecha de esa operación ahí mismo</b>: se actualiza solo esa celda y se <b>regenera el Excel adjunto</b> antes de enviar. Si quedan alertas sin resolver, la app <b>avisa pero te deja enviar</b>.</li>
-      </ol>
-    </div>
-    <p id="descIdle" style="color:var(--muted);font-style:italic;margin:6px 0">Selecciona una operación arriba para ver el detalle.</p>
-    <p style="margin-top:10px;color:var(--muted);font-size:12.5px">
-      <b>Limitación:</b> los estilos visuales del macro (colores de encabezado, fondos, bordes) no se pueden aplicar desde el navegador — solo los <b>datos</b>, la <b>estructura</b> y los <b>formatos numéricos</b> son idénticos. Si necesitas el look-and-feel exacto, corre el <code class="inline">.bas</code> en Excel.
-    </p>
-  </section>
-
-  <section class="card">
-    <h2>Código VBA de referencia</h2>
-    <div class="tabs" role="tablist">
-      <button class="tab active" data-tab="tab-limpieza">Limpieza_Va6s_Excel.bas</button>
-      <button class="tab" data-tab="tab-distribuir">DistribuirPaymentTape.bas</button>
-    </div>
-
-    <div class="tab-panel active" id="tab-limpieza">
-      <div class="toolbar">
-        <span>📄</span>
-        <span class="fname">Macro_Va6s.bas</span>
-        <span class="spacer"></span>
-        <button class="btn ghost-dark" id="btnCopyLimp">📋 Copiar</button>
-        <button class="btn primary" id="btnDlLimp">⬇ Descargar .bas</button>
-      </div>
-      <details class="detail" id="detLimp">
-        <summary>Ver / ocultar código</summary>
-        <pre class="code"><div class="code-inner"><div class="gutter" id="gutterLimp"></div><div class="lines" id="linesLimp"></div></div></pre>
-      </details>
-    </div>
-
-    <div class="tab-panel" id="tab-distribuir">
-      <div class="toolbar">
-        <span>📄</span>
-        <span class="fname">DistribuirPaymentTape.bas</span>
-        <span class="spacer"></span>
-        <button class="btn ghost-dark" id="btnCopyDist">📋 Copiar</button>
-        <button class="btn primary" id="btnDlDist">⬇ Descargar .bas</button>
-      </div>
-      <details class="detail" id="detDist">
-        <summary>Ver / ocultar código</summary>
-        <pre class="code"><div class="code-inner"><div class="gutter" id="gutterDist"></div><div class="lines" id="linesDist"></div></div></pre>
-      </details>
-    </div>
-  </section>
+  </div><!-- /panelApp -->
 
   <footer><b>Liquitech</b> · Utilidades Va6s — herramienta autocontenida, funciona sin conexión a internet.</footer>
 </div>
@@ -1073,10 +1080,6 @@ document.querySelectorAll(".op").forEach(el => {
     document.querySelectorAll(".op").forEach(o => o.classList.remove("active"));
     el.classList.add("active");
     currentOp = el.dataset.op;
-    $("descLimpieza").style.display = currentOp === "limpieza" ? "" : "none";
-    $("descDistribuir").style.display = currentOp === "distribuir" ? "" : "none";
-    $("descIndividual").style.display = currentOp === "individual" ? "" : "none";
-    $("descIdle").style.display = "none";
     updateProcessButton();
   });
 });
@@ -1984,23 +1987,62 @@ const EMAIL_STORE_KEY = "va6s_investor_emails"; // fallback navegador (clave: NI
 let DIRECTORY = {}; // { nit: { email, name } }
 
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
-function dirEmailFor(nit){ const e = DIRECTORY[String(nit || "").trim()]; return e ? e.email : ""; }
+function dirEntryFor(nit){ return DIRECTORY[String(nit || "").trim()] || { emails: [], name: "" }; }
+function dirEmailsFor(nit){ return dirEntryFor(nit).emails.slice(); }
+function dirEmailFor(nit){ const e = dirEntryFor(nit).emails; return e.length ? e[0] : ""; } // compat
+function dirNameFor(nit){ return dirEntryFor(nit).name || ""; }
+
+// Normaliza una entrada a { emails:[...], name } (migra el formato antiguo { email })
+function normDirEntry(e){
+  let emails = Array.isArray(e && e.emails) ? e.emails.slice() : (e && e.email ? [e.email] : []);
+  emails = emails.map(x => String(x || "").trim()).filter(Boolean);
+  emails = emails.filter((v, i) => emails.indexOf(v) === i); // sin duplicados, en orden
+  return { emails, name: (e && e.name) || "" };
+}
+function normDirectory(raw){
+  const out = {};
+  for(const k of Object.keys(raw || {})) out[k] = normDirEntry(raw[k]);
+  return out;
+}
 
 async function loadDirectory(){
+  let raw = {};
   if(window.api && window.api.getDirectory){
-    try { DIRECTORY = (await window.api.getDirectory()) || {}; return; } catch(_){}
+    try { raw = (await window.api.getDirectory()) || {}; } catch(_){ raw = {}; }
+  } else {
+    try { raw = JSON.parse(localStorage.getItem(EMAIL_STORE_KEY) || "{}"); } catch(_){ raw = {}; }
   }
-  try { DIRECTORY = JSON.parse(localStorage.getItem(EMAIL_STORE_KEY) || "{}"); }
-  catch(_){ DIRECTORY = {}; }
+  DIRECTORY = normDirectory(raw);
 }
-async function saveDirectoryEntry(nit, email, name){
+
+// patch = { emails?:[...], name?:string }. Si se omite `emails`, se conservan los actuales.
+async function saveDirectoryEntry(nit, patch){
+  const key = String(nit || "").trim();
+  if(!key) return;
+  patch = patch || {};
+  if(window.api && window.api.setDirectoryEntry){
+    try {
+      const payload = { nit:key, name: patch.name };
+      if(patch.emails !== undefined) payload.emails = patch.emails;
+      DIRECTORY = normDirectory((await window.api.setDirectoryEntry(payload)) || {});
+      return;
+    } catch(_){}
+  }
+  const cur = DIRECTORY[key] || { emails:[], name:"" };
+  const emails = patch.emails !== undefined ? normDirEntry({ emails: patch.emails }).emails : cur.emails;
+  const name = patch.name !== undefined ? String(patch.name || "").trim() : cur.name;
+  if(emails.length || name) DIRECTORY[key] = { emails, name }; else delete DIRECTORY[key];
+  try { localStorage.setItem(EMAIL_STORE_KEY, JSON.stringify(DIRECTORY)); } catch(_){}
+}
+
+async function deleteDirectoryEntry(nit){
   const key = String(nit || "").trim();
   if(!key) return;
   if(window.api && window.api.setDirectoryEntry){
-    try { DIRECTORY = (await window.api.setDirectoryEntry({ nit:key, email, name })) || DIRECTORY; return; }
+    try { DIRECTORY = normDirectory((await window.api.setDirectoryEntry({ nit:key, emails:[], name:"" })) || {}); return; }
     catch(_){}
   }
-  if(email) DIRECTORY[key] = { email, name: name || "" }; else delete DIRECTORY[key];
+  delete DIRECTORY[key];
   try { localStorage.setItem(EMAIL_STORE_KEY, JSON.stringify(DIRECTORY)); } catch(_){}
 }
 
@@ -2041,18 +2083,21 @@ function alertBlockHTML(r, invIdx){
 }
 
 // Guarda en el directorio los correos actualmente escritos (evita perderlos al re-renderizar)
-async function persistVisibleEmails(){
-  const inputs = Array.from(document.querySelectorAll('#individualList input[type="email"]'));
-  await Promise.all(inputs.map(inp => {
-    const idx = Number(inp.dataset.idx);
-    const r = individualResults[idx];
-    return r ? saveDirectoryEntry(r.nit, (inp.value || "").trim(), r.name) : null;
-  }));
+// Agrega al directorio (solo el nombre) los inversionistas nuevos que aparecen al procesar un archivo.
+async function syncInvestorsToDirectory(){
+  let added = false;
+  for(const r of individualResults){
+    const k = String(r.nit || "").trim();
+    if(k && !DIRECTORY[k]){ await saveDirectoryEntry(k, { name: r.name }); added = true; }
+  }
+  return added;
 }
 
 async function renderIndividualResults(){
   await loadDirectory();
   await loadSiigoAccounts();
+  const added = await syncInvestorsToDirectory();
+  if(added && typeof renderDirectory === "function") renderDirectory();
   individualResults.forEach(r => { r.alerts = computeDateAlerts(r.filtered); });
   const totalAlerts = individualResults.reduce((n, r) => n + (r.alerts ? r.alerts.length : 0), 0);
   const invWithAlerts = individualResults.filter(r => r.alerts && r.alerts.length).length;
@@ -2100,7 +2145,10 @@ async function renderIndividualResults(){
 
   individualResults.forEach((r, idx) => {
     const draft = buildEmailDraft(r.name, r.count, r.total);
-    const savedEmail = dirEmailFor(r.nit);
+    const emails = dirEmailsFor(r.nit);
+    const emailsHtml = emails.length
+      ? '<div class="inv-emails-ro">' + emails.map(e => '<span class="ro-chip">' + escHtml(e) + '</span>').join("") + '</div>'
+      : '<span class="ro-missing">Sin correo configurado</span>';
     const hasAlert = r.alerts && r.alerts.length;
     const card = document.createElement("div");
     card.className = "inv-card" + (hasAlert ? " has-alert" : "");
@@ -2111,8 +2159,9 @@ async function renderIndividualResults(){
       '</div>' +
       (hasAlert ? alertBlockHTML(r, idx) : '') +
       '<div class="inv-email">' +
-        '<label for="email-' + idx + '">Correo:</label>' +
-        '<input type="email" id="email-' + idx + '" data-idx="' + idx + '" placeholder="nombre@dominio.com" value="' + escHtml(savedEmail) + '">' +
+        '<span class="inv-label">Correo:</span>' +
+        emailsHtml +
+        '<button class="linklike" data-act="cfg-mail" data-idx="' + idx + '" style="margin-left:auto">⚙ ' + (emails.length ? 'Editar' : 'Configurar') + '</button>' +
       '</div>' +
       '<div class="inv-actions">' +
         '<button class="btn ok" data-act="send" data-idx="' + idx + '">📧 Enviar</button>' +
@@ -2126,11 +2175,10 @@ async function renderIndividualResults(){
   });
 
   // Cambio de fecha de referencia -> recalcular alertas
-  $("refDate").addEventListener("change", async () => {
+  $("refDate").addEventListener("change", () => {
     const s = ymdToSerial($("refDate").value);
     if(s == null) return;
     REFERENCE_SERIAL = s;
-    await persistVisibleEmails();
     renderIndividualResults();
   });
 
@@ -2147,18 +2195,15 @@ async function renderIndividualResults(){
       r.blob = buildIndividualBlob(r.filtered, r.total);
       log("• Fecha de liquidación actualizada — " + r.name + " · " + rowLabel(r.filtered, rowIdx) + " → " + serialToDMY(serial), "step");
       showToast("Fecha actualizada · Excel regenerado");
-      await persistVisibleEmails();
       renderIndividualResults();
     });
   });
 
-  // Guardar el correo en el directorio (por NIT) al editarlo
-  list.querySelectorAll('input[type="email"]').forEach(inp => {
-    inp.addEventListener("change", () => {
-      const idx = Number(inp.dataset.idx);
-      const v = inp.value.trim();
-      inp.classList.toggle("invalid", v.length > 0 && !isValidEmail(v));
-      saveDirectoryEntry(individualResults[idx].nit, v, individualResults[idx].name);
+  // Enlaces "⚙ Configurar/Editar" → saltan al directorio en la pestaña Configuración
+  list.querySelectorAll('button[data-act="cfg-mail"], button[data-act="cfg-siigo"]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const r = individualResults[Number(btn.dataset.idx)];
+      jumpToDirectory(r.nit, r.name);
     });
   });
 
@@ -2185,15 +2230,6 @@ async function renderIndividualResults(){
   $("btnSendAll").addEventListener("click", sendAll);
 
   if(SIIGO_READY){
-    list.querySelectorAll('.sg-debit, .sg-credit').forEach(inp => {
-      inp.addEventListener("change", () => {
-        const idx = Number(inp.dataset.idx);
-        const card = inp.closest(".inv-card");
-        const debit = card.querySelector('.sg-debit').value.trim();
-        const credit = card.querySelector('.sg-credit').value.trim();
-        saveSiigoAccount(individualResults[idx].nit, debit, credit);
-      });
-    });
     list.querySelectorAll('button[data-act="siigo"]').forEach(btn => {
       btn.addEventListener("click", () => registerOne(Number(btn.dataset.idx)));
     });
@@ -2224,12 +2260,13 @@ async function ensureMailReady(){
 async function sendOne(idx, opts){
   opts = opts || {};
   const r = individualResults[idx];
-  const inp = $("email-" + idx);
-  const email = (inp.value || "").trim();
-  if(!email || !isValidEmail(email)){
-    inp.classList.add("invalid");
-    inp.focus();
-    showToast("Escribe un correo válido para " + r.name, false);
+  const emails = dirEmailsFor(r.nit).filter(isValidEmail);
+  if(!emails.length){
+    setInvState(idx, "Sin correo", "var(--err)");
+    if(!opts.fromBulk){
+      showToast("Configura el correo de " + r.name + " en la pestaña Configuración.", false);
+      jumpToDirectory(r.nit, r.name);
+    }
     return false;
   }
   // Aviso si hay operaciones con Fecha de liquidación fuera de rango (permite enviar igual).
@@ -2239,18 +2276,17 @@ async function sendOne(idx, opts){
   }
   if(!(await ensureMailReady())) return false;
 
-  await saveDirectoryEntry(r.nit, email, r.name);
   setInvState(idx, "Enviando…", "var(--warn)");
   try {
     const draft = buildEmailDraft(r.name, r.count, r.total);
     const contentBase64 = await blobToBase64(r.blob);
     const res = await window.api.sendMail({
-      to: email, subject: draft.subject, body: draft.body,
+      to: emails, subject: draft.subject, body: draft.body,
       filename: r.fileName, contentBase64
     });
     if(res && res.ok){
       setInvState(idx, "✓ Enviado", "var(--ok)");
-      log("✓ Enviado a " + r.name + " <" + email + ">", "ok");
+      log("✓ Enviado a " + r.name + " <" + emails.join(", ") + ">", "ok");
       return true;
     }
     setInvState(idx, "✗ Error", "var(--err)");
@@ -2269,12 +2305,11 @@ async function sendAll(){
 
   const targets = [];
   for(let i = 0; i < individualResults.length; i++){
-    const e = ($("email-" + i).value || "").trim();
-    if(e && isValidEmail(e)) targets.push(i);
+    if(dirEmailsFor(individualResults[i].nit).filter(isValidEmail).length) targets.push(i);
   }
   const missing = individualResults.length - targets.length;
   if(targets.length === 0){
-    showToast("No hay correos válidos para enviar.", false);
+    showToast("Ningún inversionista tiene correo configurado (revisa Configuración).", false);
     return;
   }
   const alertCount = targets.filter(i => individualResults[i].alerts && individualResults[i].alerts.length).length;
@@ -2407,18 +2442,7 @@ function renderCode(raw, gutterId, linesId){
   $(linesId).innerHTML = lines.map(hiLine).join("\n");
   $(gutterId).textContent = lines.map((_,i)=>String(i+1)).join("\n");
 }
-renderCode(rawLimp, "gutterLimp", "linesLimp");
-renderCode(rawDist, "gutterDist", "linesDist");
-
-// Tabs
-document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
-  document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
-  t.classList.add("active");
-  $(t.dataset.tab).classList.add("active");
-}));
-
-// Copiar y descargar (por cada macro)
+// Copiar al portapapeles (usado por las tarjetas de inversionista)
 function copyText(txt){
   return navigator.clipboard.writeText(txt).catch(() => {
     const ta = document.createElement("textarea");
@@ -2438,11 +2462,6 @@ function downloadB64(b64, filename){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1500);
 }
-$("btnCopyLimp").addEventListener("click", () => copyText(rawLimp).then(()=>showToast("Código copiado")));
-$("btnCopyDist").addEventListener("click", () => copyText(rawDist).then(()=>showToast("Código copiado")));
-$("btnDlLimp").addEventListener("click",   () => { downloadB64(b64Limp, "Limpieza_Va6s.bas");        showToast("Descargando .bas"); });
-$("btnDlDist").addEventListener("click",   () => { downloadB64(b64Dist, "DistribuirPaymentTape.bas"); showToast("Descargando .bas"); });
-
 // ============================================================================
 //  Configuración de correo (⚙) — solo activa en la app instalada (window.api)
 // ============================================================================
@@ -2519,28 +2538,41 @@ let SIIGO_CFG = { nitLine: "both", documentId: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
 
+const SIIGO_ACC_KEY = "va6s_siigo_accounts"; // fallback navegador (clave: NIT)
 async function loadSiigoAccounts(){
   if(window.api && window.api.siigoGetAccounts){
     try { SIIGO_ACCOUNTS = (await window.api.siigoGetAccounts()) || {}; return; } catch(_){}
   }
-  SIIGO_ACCOUNTS = {};
+  try { SIIGO_ACCOUNTS = JSON.parse(localStorage.getItem(SIIGO_ACC_KEY) || "{}"); }
+  catch(_){ SIIGO_ACCOUNTS = {}; }
 }
 async function saveSiigoAccount(nit, debit, credit){
   const key = String(nit || "").trim();
-  if(!key || !(window.api && window.api.siigoSetAccount)) return;
-  try { SIIGO_ACCOUNTS = (await window.api.siigoSetAccount({ nit:key, debit, credit })) || SIIGO_ACCOUNTS; } catch(_){}
+  if(!key) return;
+  if(window.api && window.api.siigoSetAccount){
+    try { SIIGO_ACCOUNTS = (await window.api.siigoSetAccount({ nit:key, debit, credit })) || SIIGO_ACCOUNTS; return; } catch(_){}
+  }
+  const d = debit != null ? String(debit).trim() : "";
+  const c = credit != null ? String(credit).trim() : "";
+  if(d || c) SIIGO_ACCOUNTS[key] = { debit:d, credit:c }; else delete SIIGO_ACCOUNTS[key];
+  try { localStorage.setItem(SIIGO_ACC_KEY, JSON.stringify(SIIGO_ACCOUNTS)); } catch(_){}
 }
+async function deleteSiigoAccount(nit){ await saveSiigoAccount(nit, "", ""); }
 function siigoAccFor(nit){ return SIIGO_ACCOUNTS[String(nit || "").trim()] || { debit:"", credit:"" }; }
 
 function siigoCardHTML(r, idx){
   if(!SIIGO_READY) return '';
   const acc = siigoAccFor(r.nit);
   const posted = SIIGO_POSTED[String(r.nit || "").trim()];
-  const st = 'style="border:1px solid var(--hairline);border-radius:9px;padding:8px 10px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#fff;width:140px"';
+  const hasAcc = acc.debit || acc.credit;
+  const accHtml = hasAcc
+    ? '<span class="ro-acct">Débito <b>' + escHtml(acc.debit || "—") + '</b> · Crédito <b>' + escHtml(acc.credit || "—") + '</b></span>'
+    : '<span class="ro-missing">Sin cuentas configuradas</span>';
   return '<div class="inv-siigo">' +
       '<span class="siigo-tag">🧾 Siigo</span>' +
-      '<input class="sg-debit" data-idx="' + idx + '" placeholder="Cuenta débito" value="' + escHtml(acc.debit || "") + '" ' + st + '>' +
-      '<input class="sg-credit" data-idx="' + idx + '" placeholder="Cuenta crédito" value="' + escHtml(acc.credit || "") + '" ' + st + '>' +
+      accHtml +
+      '<button class="linklike" data-act="cfg-siigo" data-idx="' + idx + '">⚙ ' + (hasAcc ? 'Editar' : 'Configurar') + '</button>' +
+      '<span style="flex:1"></span>' +
       '<button class="btn" data-act="siigo" data-idx="' + idx + '">Registrar en Siigo</button>' +
       '<span class="sg-state" data-sg="' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' +
         (posted ? ("✓ Comp. " + escHtml(String(posted.number))) : "") + '</span>' +
@@ -2554,16 +2586,20 @@ function setSgState(idx, text, color){
 async function registerOne(idx, opts){
   opts = opts || {};
   if(!SIIGO_READY){
-    showToast("Configura Siigo (arriba) antes de registrar.", false);
+    showToast("Configura Siigo en la pestaña Configuración antes de registrar.", false);
+    showTab("panelConfig");
     document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
     return false;
   }
   const r = individualResults[idx];
-  const dEl = document.querySelector('.sg-debit[data-idx="' + idx + '"]');
-  const cEl = document.querySelector('.sg-credit[data-idx="' + idx + '"]');
-  const debit = (dEl && dEl.value || "").trim();
-  const credit = (cEl && cEl.value || "").trim();
-  if(!debit || !credit){ showToast("Escribe cuenta débito y crédito para " + r.name, false); if(dEl && !debit) dEl.focus(); return false; }
+  const acc = siigoAccFor(r.nit);
+  const debit = (acc.debit || "").trim();
+  const credit = (acc.credit || "").trim();
+  if(!debit || !credit){
+    showToast("Configura las cuentas de " + r.name + " en la pestaña Configuración.", false);
+    if(!opts.fromBulk) jumpToDirectory(r.nit, r.name);
+    return false;
+  }
   const date = ($("sgDate") && $("sgDate").value) || serialToYMD(REFERENCE_SERIAL);
   const nitKey = String(r.nit || "").trim();
 
@@ -2576,7 +2612,6 @@ async function registerOne(idx, opts){
       "Débito  · cuenta " + debit + "\nCrédito · cuenta " + credit + "\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
     if(!window.confirm(preview)) return false;
   }
-  await saveSiigoAccount(r.nit, debit, credit);
   setSgState(idx, "Registrando…", "var(--warn)");
   try {
     const res = await window.api.siigoCreateJournal({
@@ -2604,11 +2639,10 @@ async function registerAll(){
   if(!SIIGO_READY){ showToast("Configura Siigo antes de registrar.", false); return; }
   const targets = [];
   for(let i = 0; i < individualResults.length; i++){
-    const d = document.querySelector('.sg-debit[data-idx="' + i + '"]');
-    const c = document.querySelector('.sg-credit[data-idx="' + i + '"]');
-    if(d && c && d.value.trim() && c.value.trim()) targets.push(i);
+    const acc = siigoAccFor(individualResults[i].nit);
+    if((acc.debit || "").trim() && (acc.credit || "").trim()) targets.push(i);
   }
-  if(!targets.length){ showToast("Ningún inversionista tiene cuentas configuradas.", false); return; }
+  if(!targets.length){ showToast("Ningún inversionista tiene cuentas configuradas (revisa Configuración).", false); return; }
   const missing = individualResults.length - targets.length;
   const date = ($("sgDate") && $("sgDate").value) || serialToYMD(REFERENCE_SERIAL);
   const already = targets.filter(i => SIIGO_POSTED[String(individualResults[i].nit || "").trim()]).length;
@@ -2701,6 +2735,218 @@ async function initSiigoConfig(){
   });
 }
 initSiigoConfig();
+
+// ============================================================================
+//  Navegación entre pestañas (Configuración / Operación)
+// ============================================================================
+function showTab(panelId){
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.toggle("active", t.dataset.panel === panelId));
+  document.querySelectorAll(".nav-panel").forEach(p => p.classList.toggle("active", p.id === panelId));
+}
+document.querySelectorAll(".nav-tab").forEach(t => {
+  t.addEventListener("click", () => showTab(t.dataset.panel));
+});
+
+// ============================================================================
+//  Directorio de inversionistas (pestaña Configuración)
+//  Por inversionista: varios correos + cuentas contables (débito/crédito).
+// ============================================================================
+let DIR_FILTER = "";
+
+function dirRowsData(){
+  const keys = {};
+  Object.keys(DIRECTORY).forEach(k => keys[k] = true);
+  Object.keys(SIIGO_ACCOUNTS).forEach(k => keys[k] = true);
+  const rows = Object.keys(keys).map(nit => {
+    const e = dirEntryFor(nit), acc = siigoAccFor(nit);
+    return { nit, name: e.name || "", emails: e.emails.slice(), debit: acc.debit || "", credit: acc.credit || "" };
+  });
+  rows.sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", "es", { sensitivity:"base" }) ||
+    a.nit.localeCompare(b.nit));
+  return rows;
+}
+
+function mailChipHTML(email){
+  return '<span class="chip-mail" data-email="' + escHtml(email) + '">' + escHtml(email) +
+    '<button type="button" data-act="rmmail" title="Quitar">✕</button></span>';
+}
+
+function dirItemHTML(row, isNew){
+  const nitField = isNew
+    ? '<input class="dir-nit" placeholder="NIT (sin dígito de verificación)" value="' + escHtml(row.nit || "") + '">'
+    : '<input class="dir-nit" value="' + escHtml(row.nit || "") + '" readonly>';
+  const chips = (row.emails || []).map(mailChipHTML).join("");
+  return '<div class="dir-item' + (isNew ? ' flash' : '') + '" data-dir-nit="' + escHtml(row.nit || "") + '"' + (isNew ? ' data-new="1"' : '') + '>' +
+      '<div class="dir-grid">' +
+        '<div>' +
+          '<label class="dir-field">NIT' + nitField + '</label>' +
+          '<label class="dir-field">Nombre' +
+            '<input class="dir-name" placeholder="Nombre del inversionista" value="' + escHtml(row.name || "") + '"></label>' +
+        '</div>' +
+        '<div>' +
+          '<label class="dir-field">Correos (uno o varios)</label>' +
+          '<div class="chips">' + (chips || '<span class="ro-missing" style="font-weight:400">Aún sin correos</span>') + '</div>' +
+          '<div class="add-email">' +
+            '<input class="add-email-input" type="email" placeholder="correo@dominio.com" autocomplete="off">' +
+            '<button class="btn" type="button" data-act="addmail">+ Agregar correo</button>' +
+          '</div>' +
+          '<div class="dir-accts" style="margin-top:12px">' +
+            '<label class="dir-field">Cuenta débito (Siigo)' +
+              '<input class="dir-debit" inputmode="numeric" placeholder="p. ej. 23359505" value="' + escHtml(row.debit || "") + '"></label>' +
+            '<label class="dir-field">Cuenta crédito (Siigo)' +
+              '<input class="dir-credit" inputmode="numeric" placeholder="p. ej. 11100505" value="' + escHtml(row.credit || "") + '"></label>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="dir-actions">' +
+        '<button class="btn primary" type="button" data-act="dirsave">💾 Guardar</button>' +
+        '<button class="btn danger" type="button" data-act="dirdel">🗑 Eliminar</button>' +
+        '<span class="dir-state"></span>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderDirectory(){
+  const list = document.getElementById("dirList");
+  if(!list) return;
+  const q = DIR_FILTER.toLowerCase();
+  const rows = dirRowsData().filter(r =>
+    !q || (r.name || "").toLowerCase().includes(q) || (r.nit || "").toLowerCase().includes(q));
+  if(!rows.length){
+    list.innerHTML = '<p class="dir-empty">' + (DIR_FILTER
+      ? 'Ningún inversionista coincide con la búsqueda.'
+      : 'Aún no hay inversionistas. Agrega uno con “+ Agregar inversionista”, o procesa un archivo en la pestaña Operación y aparecerán aquí.') + '</p>';
+    return;
+  }
+  list.innerHTML = rows.map(r => dirItemHTML(r, false)).join("");
+}
+
+function addInvestorRow(){
+  const list = document.getElementById("dirList");
+  if(!list) return;
+  const existingNew = list.querySelector('.dir-item[data-new="1"]');
+  if(existingNew){
+    existingNew.scrollIntoView({ behavior:"smooth", block:"center" });
+    const n = existingNew.querySelector('.dir-nit'); if(n) n.focus();
+    return;
+  }
+  const empty = list.querySelector('.dir-empty'); if(empty) empty.remove();
+  const tmp = document.createElement("div");
+  tmp.innerHTML = dirItemHTML({ nit:"", name:"", emails:[], debit:"", credit:"" }, true);
+  const node = tmp.firstElementChild;
+  list.insertBefore(node, list.firstChild);
+  node.scrollIntoView({ behavior:"smooth", block:"center" });
+  const n = node.querySelector('.dir-nit'); if(n) n.focus();
+}
+
+function addMailToRow(item){
+  const inp = item.querySelector('.add-email-input');
+  const v = (inp.value || "").trim();
+  if(!v) return;
+  if(!isValidEmail(v)){ inp.classList.add("invalid"); showToast("Correo no válido: " + v, false); return; }
+  inp.classList.remove("invalid");
+  const chipsBox = item.querySelector('.chips');
+  const exists = Array.from(chipsBox.querySelectorAll('.chip-mail'))
+    .some(c => c.dataset.email.toLowerCase() === v.toLowerCase());
+  if(exists){ showToast("Ese correo ya está en la lista.", false); inp.value = ""; return; }
+  const miss = chipsBox.querySelector('.ro-missing'); if(miss) miss.remove();
+  chipsBox.insertAdjacentHTML("beforeend", mailChipHTML(v));
+  inp.value = "";
+  inp.focus();
+}
+
+function readRowEmails(item){
+  return Array.from(item.querySelectorAll('.chip-mail')).map(c => c.dataset.email);
+}
+
+async function saveDirItem(item){
+  const nit = (item.querySelector('.dir-nit').value || "").trim();
+  const name = (item.querySelector('.dir-name').value || "").trim();
+  const debit = (item.querySelector('.dir-debit').value || "").trim();
+  const credit = (item.querySelector('.dir-credit').value || "").trim();
+  const emails = readRowEmails(item);
+  // Incluir un correo escrito pero no agregado con "+"
+  const pending = (item.querySelector('.add-email-input').value || "").trim();
+  if(pending){
+    if(!isValidEmail(pending)){ showToast("Correo no válido: " + pending, false); return; }
+    if(!emails.some(e => e.toLowerCase() === pending.toLowerCase())) emails.push(pending);
+  }
+  if(!nit){ showToast("Escribe el NIT del inversionista.", false); item.querySelector('.dir-nit').focus(); return; }
+
+  await saveDirectoryEntry(nit, { emails, name });
+  await saveSiigoAccount(nit, debit, credit);
+  showToast("Inversionista guardado: " + (name || nit));
+  renderDirectory();
+  if(individualResults.length) renderIndividualResults();
+}
+
+async function deleteDirItem(item){
+  const isNew = item.dataset.new === "1";
+  const nit = (item.querySelector('.dir-nit').value || "").trim();
+  const name = (item.querySelector('.dir-name').value || "").trim();
+  if(isNew){
+    item.remove();
+    if(!document.querySelector('#dirList .dir-item')) renderDirectory();
+    return;
+  }
+  if(!window.confirm("¿Eliminar del directorio a " + (name || nit) + "?\nSe borran sus correos y cuentas guardados.")) return;
+  await deleteDirectoryEntry(nit);
+  await deleteSiigoAccount(nit);
+  showToast("Inversionista eliminado del directorio.");
+  renderDirectory();
+  if(individualResults.length) renderIndividualResults();
+}
+
+function initDirectory(){
+  const list = document.getElementById("dirList");
+  const addBtn = document.getElementById("btnAddInvestor");
+  const search = document.getElementById("dirSearch");
+  if(!list) return;
+  if(addBtn) addBtn.addEventListener("click", addInvestorRow);
+  if(search) search.addEventListener("input", () => { DIR_FILTER = search.value.trim(); renderDirectory(); });
+
+  list.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if(!btn) return;
+    const item = btn.closest(".dir-item");
+    if(!item) return;
+    const act = btn.dataset.act;
+    if(act === "addmail") addMailToRow(item);
+    else if(act === "rmmail"){ const chip = btn.closest(".chip-mail"); if(chip) chip.remove(); }
+    else if(act === "dirsave") saveDirItem(item);
+    else if(act === "dirdel") deleteDirItem(item);
+  });
+  list.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && e.target.classList.contains("add-email-input")){
+      e.preventDefault();
+      addMailToRow(e.target.closest(".dir-item"));
+    }
+  });
+
+  loadDirectory().then(loadSiigoAccounts).then(renderDirectory);
+}
+initDirectory();
+
+// Salta al directorio (pestaña Configuración) y resalta/crea la fila del inversionista.
+async function jumpToDirectory(nit, name){
+  const key = String(nit || "").trim();
+  if(key && !DIRECTORY[key]) await saveDirectoryEntry(key, { name: name || "" });
+  await loadDirectory(); await loadSiigoAccounts();
+  DIR_FILTER = ""; const s = document.getElementById("dirSearch"); if(s) s.value = "";
+  renderDirectory();
+  showTab("panelConfig");
+  const sel = (window.CSS && CSS.escape) ? CSS.escape(key) : key;
+  const row = key ? document.querySelector('.dir-item[data-dir-nit="' + sel + '"]') : null;
+  if(row){
+    row.scrollIntoView({ behavior:"smooth", block:"center" });
+    row.classList.add("flash"); setTimeout(() => row.classList.remove("flash"), 1600);
+    const inp = row.querySelector('.add-email-input'); if(inp) inp.focus();
+  } else {
+    const card = document.getElementById("cardDirectory");
+    if(card) card.scrollIntoView({ behavior:"smooth" });
+  }
+}
 
 /* Estado inicial */
 setStatus("Elige una operación", "");

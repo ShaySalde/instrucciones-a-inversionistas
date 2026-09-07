@@ -82,14 +82,33 @@ function makeTransport() {
   });
 }
 
-// ---- Directorio inversionista(NIT) -> correo -----------------------------------
-function loadDirectory() { return readJson(directoryPath(), {}); }
+// ---- Directorio inversionista(NIT) -> correos ----------------------------------
+// directory.json: { [nit]: { emails: [..], name } }  (migra el formato antiguo { email })
+function normDirEntry(e) {
+  let emails = Array.isArray(e && e.emails) ? e.emails.slice() : (e && e.email ? [e.email] : []);
+  emails = emails.map((x) => String(x || "").trim()).filter(Boolean);
+  emails = emails.filter((v, i) => emails.indexOf(v) === i); // sin duplicados, en orden
+  return { emails, name: (e && e.name) || "" };
+}
+function loadDirectory() {
+  const raw = readJson(directoryPath(), {});
+  const out = {};
+  for (const k of Object.keys(raw)) out[k] = normDirEntry(raw[k]);
+  return out;
+}
 
-function setDirectoryEntry({ nit, email, name }) {
+// Fusiona: si `emails` es undefined, conserva los actuales; si `name` es undefined, conserva el actual.
+function setDirectoryEntry({ nit, emails, email, name }) {
   const d = loadDirectory();
   const key = String(nit || "").trim();
   if (!key) return d;
-  if (email) d[key] = { email: String(email).trim(), name: name || (d[key] && d[key].name) || "" };
+  const cur = d[key] || { emails: [], name: "" };
+  let newEmails = cur.emails;
+  if (emails !== undefined) newEmails = normDirEntry({ emails }).emails;
+  else if (email !== undefined) newEmails = normDirEntry({ email }).emails; // compat
+  const newName = (name !== undefined && name !== null) ? String(name).trim() : cur.name;
+  const entry = { emails: newEmails, name: newName || "" };
+  if (entry.emails.length || entry.name) d[key] = entry;
   else delete d[key];
   writeJson(directoryPath(), d);
   return d;
@@ -99,7 +118,9 @@ function importDirectory(entries) {
   const d = loadDirectory();
   for (const e of entries || []) {
     const key = String(e.nit || "").trim();
-    if (key && e.email) d[key] = { email: String(e.email).trim(), name: e.name || "" };
+    if (!key) continue;
+    const entry = normDirEntry(e);
+    if (entry.emails.length || entry.name) d[key] = entry;
   }
   writeJson(directoryPath(), d);
   return d;
