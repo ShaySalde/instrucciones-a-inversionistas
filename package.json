@@ -1,0 +1,47 @@
+{
+  "name": "utilidades-va6s",
+  "productName": "Utilidades Va6s",
+  "version": "1.0.0",
+  "description": "Procesa payment tape / inversión y envía los reportes por correo a cada inversionista.",
+  "author": "Salde",
+  "license": "UNLICENSED",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.16"
+  },
+  "build": {
+    "appId": "co.salde.utilidadesva6s",
+    "productName": "Utilidades Va6s",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "Utilidades-Va6s-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Utilidades Va6s"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.business"
+    }
+  }
+}

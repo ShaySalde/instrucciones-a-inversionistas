@@ -1,0 +1,34 @@
+name: Build Windows Installer
+
+# Genera el instalador .exe de Windows en una máquina Windows real.
+# Se ejecuta al hacer push a main, o manualmente desde la pestaña "Actions".
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows installer
+        run: npm run dist
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Utilidades-Va6s-Windows-Installer
+          path: dist/*.exe
+          if-no-files-found: error
