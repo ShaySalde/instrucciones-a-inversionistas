@@ -4,17 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Utilidades Va6s</title>
+<link rel="stylesheet" href="fonts/poppins.css">
 <style>
   :root{
     --bg:#f5f6f8;
     --card:#ffffff;
-    --ink:#1f2430;
+    --ink:#1D1D1B;
     --muted:#5b6472;
     --line:#e6e8ee;
-    --accent:#4b3b8f;
-    --accent-2:#6b57b8;
-    --accent-hover:#7c68c9;
-    --accent-b:#1f4e78;
+    --accent:#775CF8;
+    --accent-2:#3974F7;
+    --accent-hover:#8f79fb;
+    --accent-b:#3974F7;
     --code-bg:#1e1e2e;
     --code-ink:#e4e4ef;
     --kw:#c58bff;
@@ -31,7 +32,7 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
-    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    font-family:"Poppins","Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
     font-size:14.5px;line-height:1.5}
   .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
   header.top{display:flex;align-items:center;gap:14px;margin-bottom:22px}
@@ -169,7 +170,7 @@
 <div class="wrap">
 
   <header class="top">
-    <div class="logo">Va6s</div>
+    <div class="logo" aria-label="Liquitech"><svg viewBox="1070.79 484.60 118.27 110.78" width="27" height="27" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M1147.31 552.79 L1132.38 571.66 L1148.36 591.86 C1149.38 593.16 1151.27 593.38 1152.58 592.36 L1166.28 581.60 C1167.58 580.58 1167.80 578.70 1166.78 577.40 L1147.32 552.80 L1147.31 552.79"/><path d="M1115.19 549.94 L1093.48 577.39 C1092.45 578.69 1092.68 580.57 1093.98 581.59 L1107.69 592.36 C1108.99 593.38 1110.87 593.15 1111.90 591.86 L1130.13 568.82 L1145.06 549.93 L1115.20 549.93 L1115.19 549.94"/><path d="M1166.14 497.60 C1166.76 496.06 1166.02 494.32 1164.48 493.70 L1148.29 487.22 C1146.76 486.60 1145.01 487.35 1144.39 488.88 L1132.66 517.95 L1156.51 521.46 L1166.13 497.60 L1166.14 497.60"/><path d="M1184.28 529.12 L1155.16 524.82 L1131.30 521.31 L1146.16 547.13 L1180.86 552.24 C1182.50 552.49 1184.02 551.35 1184.27 549.72 L1186.82 532.52 C1187.06 530.88 1185.92 529.36 1184.28 529.12"/><path d="M1101.10 525.36 L1075.56 529.12 C1073.92 529.36 1072.79 530.88 1073.03 532.52 L1075.58 549.72 C1075.82 551.35 1077.35 552.48 1078.99 552.24 L1110.08 547.66 L1101.10 525.36"/><path d="M1104.68 524.80 L1104.68 524.82 L1113.69 547.13 L1128.55 521.31 L1115.47 488.88 C1114.85 487.35 1113.10 486.60 1111.56 487.22 L1095.37 493.71 C1093.83 494.33 1093.08 496.07 1093.70 497.60 L1104.67 524.80 L1104.68 524.80"/></svg></div>
     <div class="titles">
       <h1>Utilidades Va6s</h1>
       <p>Procesa el payment tape y envía cada reporte por correo a su inversionista — app de escritorio.</p>
@@ -276,7 +277,7 @@
         <li>Usa la misma hoja fuente y mapeo de columnas que <b>Distribuir Payment Tape</b> (incluyendo el recálculo de <i>Fecha de liquidación</i> = Fecha de compraventa + Días de liquidación).</li>
         <li>Filtra únicamente estas 18 columnas: <code class="inline">ID Deudor, Deudor, ID Emisor, Emisor, Tipo de Operación, No Pago, No. Factura, Fecha de liquidación, Estado del Pago, Nombre Inversionista, NIT inversionista, Fecha de compraventa, Días de liquidación, Tasa Inversionista, Valor Invertido, Fecha de compraventa ajustada, rendimientos2, Total para inversionista</code>.</li>
         <li>Agrupa las filas por <i>Nombre Inversionista</i> y crea un libro <code class="inline">.xlsx</code> independiente por cada uno, con una fila <b>Total</b> al final (suma de <i>Total para inversionista</i>).</li>
-        <li>Para cada inversionista muestra una tarjeta con: campo de correo (se guarda en este navegador para la próxima vez), botón de descarga de su Excel, botón <b>Abrir correo</b> (abre tu programa de correo con destinatario/asunto/cuerpo listos vía <code class="inline">mailto:</code> — debes adjuntar el Excel manualmente, los navegadores no permiten adjuntar archivos por seguridad) y botón para copiar el texto del correo.</li>
+        <li>Para cada inversionista muestra una tarjeta con: campo de correo (se guarda en el <b>directorio por NIT</b> de este equipo para la próxima vez), botón <b>Enviar</b> (envía el reporte desde tu Gmail configurado con el <b>Excel ya adjunto</b>, sin pasos manuales), botón <b>Enviar a todos</b> para el lote completo, y botones para descargar el Excel o copiar el texto del correo.</li>
       </ol>
     </div>
     <p id="descIdle" style="color:var(--muted);font-style:italic;margin:6px 0">Selecciona una operación arriba para ver el detalle.</p>

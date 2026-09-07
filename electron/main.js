@@ -148,6 +148,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: "Utilidades Va6s",
+    icon: path.join(__dirname, "..", "build", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
