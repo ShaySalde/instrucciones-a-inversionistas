@@ -18,6 +18,15 @@ contextBridge.exposeInMainWorld("api", {
   setDirectoryEntry: (payload) => ipcRenderer.invoke("dir:setEntry", payload),
   importDirectory: (entries) => ipcRenderer.invoke("dir:import", entries),
 
+  // Siigo (comprobantes contables)
+  siigoGetConfig: () => ipcRenderer.invoke("siigo:getConfig"),
+  siigoSaveConfig: (payload) => ipcRenderer.invoke("siigo:saveConfig", payload),
+  siigoVerify: () => ipcRenderer.invoke("siigo:verify"),
+  siigoGetDocumentTypes: () => ipcRenderer.invoke("siigo:getDocumentTypes"),
+  siigoGetAccounts: () => ipcRenderer.invoke("siigo:getAccounts"),
+  siigoSetAccount: (payload) => ipcRenderer.invoke("siigo:setAccount", payload),
+  siigoCreateJournal: (payload) => ipcRenderer.invoke("siigo:createJournal", payload),
+
   // Utilidades
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
 });
