@@ -29,6 +29,6 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: Utilidades-Va6s-Windows-Installer
+          name: Instrucciones-a-Inversionistas-Windows-Installer
           path: dist/*.exe
           if-no-files-found: error

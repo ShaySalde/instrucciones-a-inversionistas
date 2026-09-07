@@ -1,4 +1,4 @@
-# Utilidades Va6s — App de escritorio
+# Instrucciones a Inversionistas — App de escritorio
 
 App de escritorio (Electron) que procesa el *payment tape* de inversión y **envía a cada
 inversionista su reporte por correo, con el Excel ya adjunto**, desde una cuenta de Gmail /
@@ -58,15 +58,15 @@ npm start
    ```bash
    git init
    git add .
-   git commit -m "Utilidades Va6s desktop"
+   git commit -m "Instrucciones a Inversionistas desktop"
    git branch -M main
    git remote add origin https://github.com/<tu-usuario>/<tu-repo>.git
    git push -u origin main
    ```
 2. En GitHub, pestaña **Actions** → el flujo *Build Windows Installer* corre solo con el push
    (o ejecútalo manualmente con **Run workflow**).
-3. Al terminar, descarga el artefacto **Utilidades-Va6s-Windows-Installer** — contiene
-   `Utilidades-Va6s-Setup-1.0.0.exe`. Ese es el instalador para Windows.
+3. Al terminar, descarga el artefacto **Instrucciones-a-Inversionistas-Windows-Installer** — contiene
+   `Instrucciones-a-Inversionistas-Setup-1.0.0.exe`. Ese es el instalador para Windows.
 
 ### Opción alternativa — compilar en un PC Windows
 
@@ -75,7 +75,7 @@ En un Windows con Node instalado:
 npm install
 npm run dist
 ```
-El instalador queda en `dist/Utilidades-Va6s-Setup-1.0.0.exe`.
+El instalador queda en `dist/Instrucciones-a-Inversionistas-Setup-1.0.0.exe`.
 
 ---
 

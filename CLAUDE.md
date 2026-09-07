@@ -1,4 +1,7 @@
-# Utilidades Va6s — Liquitech
+# Instrucciones a Inversionistas — Liquitech
+
+(Display name is "Instrucciones a Inversionistas"; the internal package id / appId
+is still `utilidades-va6s` / `co.salde.utilidadesva6s` — keep those stable.)
 
 Electron desktop app (Windows) that processes a payment-tape / investment Excel,
 emails a per-investor report (Excel attached), and registers one accounting

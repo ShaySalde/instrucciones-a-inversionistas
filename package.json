@@ -1,6 +1,6 @@
 {
   "name": "utilidades-va6s",
-  "productName": "Utilidades Va6s",
+  "productName": "Instrucciones a Inversionistas",
   "version": "1.0.0",
   "description": "Procesa payment tape / inversión y envía los reportes por correo a cada inversionista.",
   "author": "Salde",
@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "co.salde.utilidadesva6s",
-    "productName": "Utilidades Va6s",
+    "productName": "Instrucciones a Inversionistas",
     "directories": { "output": "dist", "buildResources": "build" },
     "files": [
       "electron/**/*",
@@ -30,7 +30,7 @@
     "win": {
       "target": ["nsis"],
       "icon": "build/icon.ico",
-      "artifactName": "Utilidades-Va6s-Setup-${version}.${ext}"
+      "artifactName": "Instrucciones-a-Inversionistas-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -38,7 +38,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Utilidades Va6s"
+      "shortcutName": "Instrucciones a Inversionistas"
     },
     "mac": {
       "target": ["dmg"],

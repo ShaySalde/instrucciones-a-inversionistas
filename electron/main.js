@@ -1,5 +1,5 @@
 // ==============================================================================
-//  Utilidades Va6s — proceso principal de Electron
+//  Instrucciones a Inversionistas — proceso principal de Electron
 //  - Sirve el HTML (renderer/index.html) como app de escritorio.
 //  - Guarda la configuración de correo con la contraseña CIFRADA por el sistema
 //    operativo (DPAPI en Windows / Keychain en macOS) vía safeStorage.
@@ -307,7 +307,7 @@ ipcMain.handle("siigo:createJournal", async (_e, p) => {
         mkItem(p2.debit, "Debit", line === "debit" || line === "both"),
         mkItem(p2.credit, "Credit", line === "credit" || line === "both"),
       ],
-      observations: "Registrado desde Utilidades Va6s · " + (p2.name || "") + (ident ? (" · NIT " + ident) : ""),
+      observations: "Registrado desde Instrucciones a Inversionistas · " + (p2.name || "") + (ident ? (" · NIT " + ident) : ""),
     };
     const r = await siigoFetch("/v1/journals", { method: "POST", body: JSON.stringify(payload) });
     if (!r.ok) return { ok: false, error: siigoErr(r) };
@@ -327,7 +327,7 @@ function createWindow() {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: "Utilidades Va6s",
+    title: "Instrucciones a Inversionistas",
     icon: path.join(__dirname, "..", "build", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
