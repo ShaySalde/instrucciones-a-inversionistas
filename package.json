@@ -13,7 +13,8 @@
   },
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "xlsx-js-style": "^1.2.0"
   },
   "dependencies": {
     "nodemailer": "^6.9.16"
@@ -21,14 +22,19 @@
   "build": {
     "appId": "co.salde.utilidadesva6s",
     "productName": "Instrucciones a Inversionistas",
-    "directories": { "output": "dist", "buildResources": "build" },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
     "files": [
       "electron/**/*",
       "renderer/**/*",
       "package.json"
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico",
       "artifactName": "Instrucciones-a-Inversionistas-Setup-${version}.${ext}"
     },
@@ -41,7 +47,9 @@
       "shortcutName": "Instrucciones a Inversionistas"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.business"
     }
   }
