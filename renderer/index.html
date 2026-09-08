@@ -361,7 +361,8 @@
     <p style="color:var(--muted);font-size:12.5px;margin:-2px 0 12px">
       Registra en Siigo un <b>comprobante contable por inversionista</b> con su <b>monto total instruido</b>.
       Requiere acceso API de Siigo. La <b>access key</b> se guarda <b>cifrada en este equipo</b> y solo se usa para
-      conectarse con Siigo. Las cuentas débito/crédito de cada inversionista se configuran en el <b>directorio de inversionistas</b>, abajo.
+      conectarse con Siigo. Cada comprobante lleva <b>2 líneas</b>: el <b>débito</b> con la cuenta de cada inversionista
+      (se configura en el <b>directorio</b>) y su NIT; y el <b>crédito</b> con una cuenta y un tercero <b>fijos</b> (aquí abajo).
     </p>
     <div class="row" style="gap:16px;align-items:flex-start">
       <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Usuario API
@@ -383,17 +384,20 @@
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
         <select id="sgDocSelect" style="display:none;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff"></select>
       </label>
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">NIT del inversionista en línea
-        <select id="sgNitLine" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-          <option value="both">Ambas líneas</option>
-          <option value="debit">Solo débito</option>
-          <option value="credit">Solo crédito</option>
-          <option value="none">Ninguna</option>
-        </select>
-      </label>
       <div style="flex:1;min-width:200px;display:flex;align-items:flex-end">
         <button class="btn" id="sgLoadTypes" style="margin-top:18px">📋 Cargar tipos desde Siigo</button>
       </div>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Línea de crédito fija</b> — igual para todos los inversionistas:</p>
+    <div class="row" style="gap:16px;align-items:flex-start">
+      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta crédito (fija)
+        <input type="text" id="sgCreditAcct" inputmode="numeric" placeholder="p. ej. 11200507" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Tercero de la línea crédito (NIT, sin DV)
+        <input type="text" id="sgCreditNit" inputmode="numeric" placeholder="p. ej. 890903938" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn primary" id="sgSave">💾 Guardar</button>
@@ -1982,26 +1986,38 @@ async function runIndividual(){
 //  - Si se abre como HTML suelto en un navegador, cae a localStorage y no envía.
 // ============================================================================
 const EMAIL_STORE_KEY = "va6s_investor_emails"; // fallback navegador (clave: NIT)
-let DIRECTORY = {}; // { nit: { email, name } }
+let DIRECTORY = {}; // { invId: { name, nit, emails:[...] } }
 
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
-function dirEntryFor(nit){ return DIRECTORY[String(nit || "").trim()] || { emails: [], name: "" }; }
-function dirEmailsFor(nit){ return dirEntryFor(nit).emails.slice(); }
-function dirEmailFor(nit){ const e = dirEntryFor(nit).emails; return e.length ? e[0] : ""; } // compat
-function dirNameFor(nit){ return dirEntryFor(nit).name || ""; }
 
-// Normaliza una entrada a { emails:[...], name } (migra el formato antiguo { email })
-function normDirEntry(e){
+// Identidad del inversionista = Nombre + NIT (dos inversionistas distintos pueden
+// compartir el mismo NIT, p. ej. BTG y Skandia), así que la clave combina ambos.
+const INV_SEP = "~|~"; // separador seguro (nunca aparece en nombres ni NITs)
+function invId(name, nit){ return String(name || "").trim() + INV_SEP + String(nit || "").trim(); }
+function idToAttr(id){ try { return btoa(unescape(encodeURIComponent(id))); } catch(_){ return ""; } }
+function splitId(id){ const i = String(id).indexOf(INV_SEP);
+  return i < 0 ? { name:String(id), nit:"" } : { name:id.slice(0, i), nit:id.slice(i + 1) }; }
+
+function normEmails(e){
   let emails = Array.isArray(e && e.emails) ? e.emails.slice() : (e && e.email ? [e.email] : []);
   emails = emails.map(x => String(x || "").trim()).filter(Boolean);
-  emails = emails.filter((v, i) => emails.indexOf(v) === i); // sin duplicados, en orden
-  return { emails, name: (e && e.name) || "" };
+  return emails.filter((v, i) => emails.indexOf(v) === i); // sin duplicados, en orden
 }
+// Re-indexa el directorio por invId(name, nit); tolera el formato antiguo (clave = NIT).
 function normDirectory(raw){
   const out = {};
-  for(const k of Object.keys(raw || {})) out[k] = normDirEntry(raw[k]);
+  for(const k of Object.keys(raw || {})){
+    const e = raw[k] || {};
+    const name = (e.name || "").trim();
+    const nit = (e.nit !== undefined && e.nit !== null ? String(e.nit) : String(k)).trim();
+    out[ invId(name, nit) ] = { name, nit, emails: normEmails(e) };
+  }
   return out;
 }
+function dirEntryFor(name, nit){
+  return DIRECTORY[ invId(name, nit) ] || { name:String(name||""), nit:String(nit||""), emails: [] };
+}
+function dirEmailsFor(name, nit){ return dirEntryFor(name, nit).emails.slice(); }
 
 async function loadDirectory(){
   let raw = {};
@@ -2013,34 +2029,34 @@ async function loadDirectory(){
   DIRECTORY = normDirectory(raw);
 }
 
-// patch = { emails?:[...], name?:string }. Si se omite `emails`, se conservan los actuales.
-async function saveDirectoryEntry(nit, patch){
-  const key = String(nit || "").trim();
-  if(!key) return;
+// Guarda por (nombre + NIT). patch = { emails?:[...] }; si se omite `emails`, se conservan los actuales.
+async function saveDirectoryEntry(name, nit, patch){
+  const nm = String(name || "").trim();
+  const nt = String(nit || "").trim();
+  if(!nm && !nt) return;
   patch = patch || {};
+  const id = invId(nm, nt);
   if(window.api && window.api.setDirectoryEntry){
     try {
-      const payload = { nit:key, name: patch.name };
+      const payload = { name: nm, nit: nt };
       if(patch.emails !== undefined) payload.emails = patch.emails;
       DIRECTORY = normDirectory((await window.api.setDirectoryEntry(payload)) || {});
       return;
     } catch(_){}
   }
-  const cur = DIRECTORY[key] || { emails:[], name:"" };
-  const emails = patch.emails !== undefined ? normDirEntry({ emails: patch.emails }).emails : cur.emails;
-  const name = patch.name !== undefined ? String(patch.name || "").trim() : cur.name;
-  if(emails.length || name) DIRECTORY[key] = { emails, name }; else delete DIRECTORY[key];
+  const cur = DIRECTORY[id] || { name:nm, nit:nt, emails:[] };
+  const emails = patch.emails !== undefined ? normEmails({ emails: patch.emails }) : cur.emails;
+  DIRECTORY[id] = { name:nm, nit:nt, emails };
   try { localStorage.setItem(EMAIL_STORE_KEY, JSON.stringify(DIRECTORY)); } catch(_){}
 }
 
-async function deleteDirectoryEntry(nit){
-  const key = String(nit || "").trim();
-  if(!key) return;
+async function deleteDirectoryEntry(name, nit){
+  const nm = String(name || "").trim(), nt = String(nit || "").trim();
   if(window.api && window.api.setDirectoryEntry){
-    try { DIRECTORY = normDirectory((await window.api.setDirectoryEntry({ nit:key, emails:[], name:"" })) || {}); return; }
+    try { DIRECTORY = normDirectory((await window.api.setDirectoryEntry({ name:nm, nit:nt, _delete:true })) || {}); return; }
     catch(_){}
   }
-  delete DIRECTORY[key];
+  delete DIRECTORY[ invId(nm, nt) ];
   try { localStorage.setItem(EMAIL_STORE_KEY, JSON.stringify(DIRECTORY)); } catch(_){}
 }
 
@@ -2081,12 +2097,12 @@ function alertBlockHTML(r, invIdx){
 }
 
 // Guarda en el directorio los correos actualmente escritos (evita perderlos al re-renderizar)
-// Agrega al directorio (solo el nombre) los inversionistas nuevos que aparecen al procesar un archivo.
+// Agrega al directorio los inversionistas nuevos que aparecen al procesar un archivo (por Nombre + NIT).
 async function syncInvestorsToDirectory(){
   let added = false;
   for(const r of individualResults){
-    const k = String(r.nit || "").trim();
-    if(k && !DIRECTORY[k]){ await saveDirectoryEntry(k, { name: r.name }); added = true; }
+    const id = invId(r.name, r.nit);
+    if((r.name || r.nit) && !DIRECTORY[id]){ await saveDirectoryEntry(r.name, r.nit, {}); added = true; }
   }
   return added;
 }
@@ -2143,7 +2159,7 @@ async function renderIndividualResults(){
 
   individualResults.forEach((r, idx) => {
     const draft = buildEmailDraft(r.name, r.count, r.total);
-    const emails = dirEmailsFor(r.nit);
+    const emails = dirEmailsFor(r.name, r.nit);
     const emailsHtml = emails.length
       ? '<div class="inv-emails-ro">' + emails.map(e => '<span class="ro-chip">' + escHtml(e) + '</span>').join("") + '</div>'
       : '<span class="ro-missing">Sin correo configurado</span>';
@@ -2201,7 +2217,7 @@ async function renderIndividualResults(){
   list.querySelectorAll('button[data-act="cfg-mail"], button[data-act="cfg-siigo"]').forEach(btn => {
     btn.addEventListener("click", () => {
       const r = individualResults[Number(btn.dataset.idx)];
-      jumpToDirectory(r.nit, r.name);
+      jumpToDirectory(r.name, r.nit);
     });
   });
 
@@ -2258,12 +2274,12 @@ async function ensureMailReady(){
 async function sendOne(idx, opts){
   opts = opts || {};
   const r = individualResults[idx];
-  const emails = dirEmailsFor(r.nit).filter(isValidEmail);
+  const emails = dirEmailsFor(r.name, r.nit).filter(isValidEmail);
   if(!emails.length){
     setInvState(idx, "Sin correo", "var(--err)");
     if(!opts.fromBulk){
       showToast("Configura el correo de " + r.name + " en la pestaña Configuración.", false);
-      jumpToDirectory(r.nit, r.name);
+      jumpToDirectory(r.name, r.nit);
     }
     return false;
   }
@@ -2303,7 +2319,7 @@ async function sendAll(){
 
   const targets = [];
   for(let i = 0; i < individualResults.length; i++){
-    if(dirEmailsFor(individualResults[i].nit).filter(isValidEmail).length) targets.push(i);
+    if(dirEmailsFor(individualResults[i].name, individualResults[i].nit).filter(isValidEmail).length) targets.push(i);
   }
   const missing = individualResults.length - targets.length;
   if(targets.length === 0){
@@ -2532,11 +2548,11 @@ initMailConfig();
 //  Siigo — comprobantes contables por inversionista (solo en la app instalada)
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante listos
-let SIIGO_CFG = { nitLine: "both", documentId: "" };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
 
-const SIIGO_ACC_KEY = "va6s_siigo_accounts"; // fallback navegador (clave: NIT)
+const SIIGO_ACC_KEY = "va6s_siigo_accounts"; // fallback navegador (clave: invId)
 async function loadSiigoAccounts(){
   if(window.api && window.api.siigoGetAccounts){
     try { SIIGO_ACCOUNTS = (await window.api.siigoGetAccounts()) || {}; return; } catch(_){}
@@ -2544,32 +2560,34 @@ async function loadSiigoAccounts(){
   try { SIIGO_ACCOUNTS = JSON.parse(localStorage.getItem(SIIGO_ACC_KEY) || "{}"); }
   catch(_){ SIIGO_ACCOUNTS = {}; }
 }
-async function saveSiigoAccount(nit, debit, credit){
-  const key = String(nit || "").trim();
-  if(!key) return;
+async function saveSiigoAccount(name, nit, debit, credit){
+  const nm = String(name || "").trim(), nt = String(nit || "").trim();
+  if(!nm && !nt) return;
   if(window.api && window.api.siigoSetAccount){
-    try { SIIGO_ACCOUNTS = (await window.api.siigoSetAccount({ nit:key, debit, credit })) || SIIGO_ACCOUNTS; return; } catch(_){}
+    try { SIIGO_ACCOUNTS = (await window.api.siigoSetAccount({ name:nm, nit:nt, debit, credit })) || SIIGO_ACCOUNTS; return; } catch(_){}
   }
+  const id = invId(nm, nt);
   const d = debit != null ? String(debit).trim() : "";
   const c = credit != null ? String(credit).trim() : "";
-  if(d || c) SIIGO_ACCOUNTS[key] = { debit:d, credit:c }; else delete SIIGO_ACCOUNTS[key];
+  if(d || c) SIIGO_ACCOUNTS[id] = { name:nm, nit:nt, debit:d, credit:c }; else delete SIIGO_ACCOUNTS[id];
   try { localStorage.setItem(SIIGO_ACC_KEY, JSON.stringify(SIIGO_ACCOUNTS)); } catch(_){}
 }
-async function deleteSiigoAccount(nit){ await saveSiigoAccount(nit, "", ""); }
-function siigoAccFor(nit){ return SIIGO_ACCOUNTS[String(nit || "").trim()] || { debit:"", credit:"" }; }
+async function deleteSiigoAccount(name, nit){ await saveSiigoAccount(name, nit, "", ""); }
+function siigoAccFor(name, nit){ const e = SIIGO_ACCOUNTS[ invId(name, nit) ] || {}; return { debit: e.debit || "", credit: e.credit || "" }; }
 
 function siigoCardHTML(r, idx){
   if(!SIIGO_READY) return '';
-  const acc = siigoAccFor(r.nit);
-  const posted = SIIGO_POSTED[String(r.nit || "").trim()];
-  const hasAcc = acc.debit || acc.credit;
-  const accHtml = hasAcc
-    ? '<span class="ro-acct">Débito <b>' + escHtml(acc.debit || "—") + '</b> · Crédito <b>' + escHtml(acc.credit || "—") + '</b></span>'
-    : '<span class="ro-missing">Sin cuentas configuradas</span>';
+  const acc = siigoAccFor(r.name, r.nit);
+  const posted = SIIGO_POSTED[ invId(r.name, r.nit) ];
+  const debit = (acc.debit || "").trim();
+  const credit = (SIIGO_CFG.creditAccount || "").trim();
+  const accHtml = debit
+    ? '<span class="ro-acct">Débito <b>' + escHtml(debit) + '</b> · Crédito <b>' + escHtml(credit || "—") + '</b> (fija)</span>'
+    : '<span class="ro-missing">Sin cuenta débito</span>';
   return '<div class="inv-siigo">' +
       '<span class="siigo-tag">🧾 Siigo</span>' +
       accHtml +
-      '<button class="linklike" data-act="cfg-siigo" data-idx="' + idx + '">⚙ ' + (hasAcc ? 'Editar' : 'Configurar') + '</button>' +
+      '<button class="linklike" data-act="cfg-siigo" data-idx="' + idx + '">⚙ ' + (debit ? 'Editar' : 'Configurar') + '</button>' +
       '<span style="flex:1"></span>' +
       '<button class="btn" data-act="siigo" data-idx="' + idx + '">Registrar en Siigo</button>' +
       '<span class="sg-state" data-sg="' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' +
@@ -2590,34 +2608,42 @@ async function registerOne(idx, opts){
     return false;
   }
   const r = individualResults[idx];
-  const acc = siigoAccFor(r.nit);
+  const acc = siigoAccFor(r.name, r.nit);
   const debit = (acc.debit || "").trim();
-  const credit = (acc.credit || "").trim();
-  if(!debit || !credit){
-    showToast("Configura las cuentas de " + r.name + " en la pestaña Configuración.", false);
-    if(!opts.fromBulk) jumpToDirectory(r.nit, r.name);
+  const creditAccount = (SIIGO_CFG.creditAccount || "").trim();
+  const creditNit = (SIIGO_CFG.creditNit || "").trim();
+  if(!debit){
+    showToast("Configura la cuenta débito de " + r.name + " en el directorio.", false);
+    if(!opts.fromBulk) jumpToDirectory(r.name, r.nit);
+    return false;
+  }
+  if(!creditAccount || !creditNit){
+    showToast("Configura la cuenta crédito fija y su tercero en la pantalla de Siigo.", false);
+    showTab("panelConfig");
+    document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
     return false;
   }
   const date = ($("sgDate") && $("sgDate").value) || serialToYMD(REFERENCE_SERIAL);
-  const nitKey = String(r.nit || "").trim();
+  const postedKey = invId(r.name, r.nit);
 
-  if(!opts.fromBulk && SIIGO_POSTED[nitKey]){
-    if(!window.confirm("Ya registraste a " + r.name + " (comprobante " + SIIGO_POSTED[nitKey].number + ").\n\n¿Registrar OTRO comprobante?")) return false;
+  if(!opts.fromBulk && SIIGO_POSTED[postedKey]){
+    if(!window.confirm("Ya registraste a " + r.name + " (comprobante " + SIIGO_POSTED[postedKey].number + ").\n\n¿Registrar OTRO comprobante?")) return false;
   }
   if(!opts.fromBulk){
     const preview = "Registrar comprobante en Siigo:\n\n" +
       "Inversionista: " + r.name + "\nNIT: " + (r.nit || "—") + "\nFecha: " + date + "\nMonto: " + fmtCOP(r.total) + "\n\n" +
-      "Débito  · cuenta " + debit + "\nCrédito · cuenta " + credit + "\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
+      "Débito  · cuenta " + debit + " · tercero " + (r.nit || "—") + "\n" +
+      "Crédito · cuenta " + creditAccount + " · tercero " + creditNit + "\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
     if(!window.confirm(preview)) return false;
   }
   setSgState(idx, "Registrando…", "var(--warn)");
   try {
     const res = await window.api.siigoCreateJournal({
       date, value: r.total, nit: r.nit, name: r.name,
-      debit, credit, documentId: SIIGO_CFG.documentId, nitLine: SIIGO_CFG.nitLine,
+      debit, creditAccount, creditNit, documentId: SIIGO_CFG.documentId,
     });
     if(res && res.ok){
-      SIIGO_POSTED[nitKey] = { number: res.number, id: res.id };
+      SIIGO_POSTED[postedKey] = { number: res.number, id: res.id };
       setSgState(idx, "✓ Comp. " + res.number, "var(--ok)");
       log("✓ Siigo: comprobante " + res.number + " registrado — " + r.name + " · " + fmtCOP(r.total), "ok");
       return true;
@@ -2635,15 +2661,20 @@ async function registerOne(idx, opts){
 
 async function registerAll(){
   if(!SIIGO_READY){ showToast("Configura Siigo antes de registrar.", false); return; }
+  if(!(SIIGO_CFG.creditAccount || "").trim() || !(SIIGO_CFG.creditNit || "").trim()){
+    showToast("Configura la cuenta crédito fija y su tercero en la pantalla de Siigo.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return;
+  }
   const targets = [];
   for(let i = 0; i < individualResults.length; i++){
-    const acc = siigoAccFor(individualResults[i].nit);
-    if((acc.debit || "").trim() && (acc.credit || "").trim()) targets.push(i);
+    const acc = siigoAccFor(individualResults[i].name, individualResults[i].nit);
+    if((acc.debit || "").trim()) targets.push(i);
   }
-  if(!targets.length){ showToast("Ningún inversionista tiene cuentas configuradas (revisa Configuración).", false); return; }
+  if(!targets.length){ showToast("Ningún inversionista tiene cuenta débito configurada (revisa el directorio).", false); return; }
   const missing = individualResults.length - targets.length;
   const date = ($("sgDate") && $("sgDate").value) || serialToYMD(REFERENCE_SERIAL);
-  const already = targets.filter(i => SIIGO_POSTED[String(individualResults[i].nit || "").trim()]).length;
+  const already = targets.filter(i => SIIGO_POSTED[ invId(individualResults[i].name, individualResults[i].nit) ]).length;
   let msg = "Vas a registrar " + targets.length + " comprobante(s) en Siigo con fecha " + date + ".";
   if(missing > 0) msg += "\n" + missing + " inversionista(s) sin cuentas se omitirán.";
   if(already > 0) msg += "\n⚠ " + already + " ya fueron registrados en esta sesión; se registrarán de nuevo.";
@@ -2672,10 +2703,12 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { nitLine: c.nitLine || "both", documentId: c.documentId || "" };
-    SIIGO_READY = !!(c.username && c.partnerId && c.hasAccessKey && c.documentId);
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "" };
+    const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
+    SIIGO_READY = !!(c.username && c.partnerId && c.hasAccessKey && cuentasOK);
     el("sgStatus").textContent = SIIGO_READY ? "Configurado ✓"
-      : (c.hasAccessKey ? "Falta el tipo de comprobante" : "Sin configurar");
+      : (!c.hasAccessKey ? "Sin configurar"
+      : (!c.documentId ? "Falta el tipo de comprobante" : "Falta la línea de crédito fija"));
     el("sgStatus").classList.toggle("ok", SIIGO_READY);
   }
   try {
@@ -2683,7 +2716,8 @@ async function initSiigoConfig(){
     el("sgUser").value = c.username || "";
     el("sgPartner").value = c.partnerId || "";
     el("sgDocId").value = c.documentId || "";
-    el("sgNitLine").value = c.nitLine || "both";
+    el("sgCreditAcct").value = c.creditAccount || "";
+    el("sgCreditNit").value = c.creditNit || "";
     refreshReady(c);
   } catch(_){}
 
@@ -2693,7 +2727,8 @@ async function initSiigoConfig(){
       partnerId: el("sgPartner").value.trim(),
       accessKey: el("sgKey").value.trim(),
       documentId: el("sgDocId").value.trim(),
-      nitLine: el("sgNitLine").value,
+      creditAccount: el("sgCreditAcct").value.trim(),
+      creditNit: el("sgCreditNit").value.trim(),
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
     try {
@@ -2752,16 +2787,19 @@ document.querySelectorAll(".nav-tab").forEach(t => {
 let DIR_FILTER = "";
 
 function dirRowsData(){
-  const keys = {};
-  Object.keys(DIRECTORY).forEach(k => keys[k] = true);
-  Object.keys(SIIGO_ACCOUNTS).forEach(k => keys[k] = true);
-  const rows = Object.keys(keys).map(nit => {
-    const e = dirEntryFor(nit), acc = siigoAccFor(nit);
-    return { nit, name: e.name || "", emails: e.emails.slice(), debit: acc.debit || "", credit: acc.credit || "" };
+  const ids = {};
+  Object.keys(DIRECTORY).forEach(k => ids[k] = true);
+  Object.keys(SIIGO_ACCOUNTS).forEach(k => ids[k] = true);
+  const rows = Object.keys(ids).map(id => {
+    const de = DIRECTORY[id], se = SIIGO_ACCOUNTS[id] || {};
+    let name = de ? de.name : (se.name || "");
+    let nit  = de ? de.nit  : (se.nit  || "");
+    if(!name && !nit){ const sp = splitId(id); name = sp.name; nit = sp.nit; }
+    return { name: name || "", nit: nit || "", emails: de ? de.emails.slice() : [], debit: se.debit || "", credit: se.credit || "" };
   });
   rows.sort((a, b) =>
     (a.name || "").localeCompare(b.name || "", "es", { sensitivity:"base" }) ||
-    a.nit.localeCompare(b.nit));
+    (a.nit || "").localeCompare(b.nit || ""));
   return rows;
 }
 
@@ -2771,16 +2809,16 @@ function mailChipHTML(email){
 }
 
 function dirItemHTML(row, isNew){
-  const nitField = isNew
-    ? '<input class="dir-nit" placeholder="NIT (sin dígito de verificación)" value="' + escHtml(row.nit || "") + '">'
-    : '<input class="dir-nit" value="' + escHtml(row.nit || "") + '" readonly>';
+  const ro = isNew ? "" : " readonly";
   const chips = (row.emails || []).map(mailChipHTML).join("");
-  return '<div class="dir-item' + (isNew ? ' flash' : '') + '" data-dir-nit="' + escHtml(row.nit || "") + '"' + (isNew ? ' data-new="1"' : '') + '>' +
+  const id = invId(row.name, row.nit);
+  return '<div class="dir-item' + (isNew ? ' flash' : '') + '" data-dir-id="' + escHtml(idToAttr(id)) + '"' + (isNew ? ' data-new="1"' : '') + '>' +
       '<div class="dir-grid">' +
         '<div>' +
-          '<label class="dir-field">NIT' + nitField + '</label>' +
-          '<label class="dir-field">Nombre' +
-            '<input class="dir-name" placeholder="Nombre del inversionista" value="' + escHtml(row.name || "") + '"></label>' +
+          '<label class="dir-field">Nombre del inversionista' +
+            '<input class="dir-name" placeholder="p. ej. BTG PACTUAL" value="' + escHtml(row.name || "") + '"' + ro + '></label>' +
+          '<label class="dir-field">NIT' +
+            '<input class="dir-nit" inputmode="numeric" placeholder="NIT" value="' + escHtml(row.nit || "") + '"' + ro + '></label>' +
         '</div>' +
         '<div>' +
           '<label class="dir-field">Correos (uno o varios)</label>' +
@@ -2790,11 +2828,10 @@ function dirItemHTML(row, isNew){
             '<button class="btn" type="button" data-act="addmail">+ Agregar correo</button>' +
           '</div>' +
           '<div class="dir-accts" style="margin-top:12px">' +
-            '<label class="dir-field">Cuenta débito (Siigo)' +
-              '<input class="dir-debit" inputmode="numeric" placeholder="p. ej. 23359505" value="' + escHtml(row.debit || "") + '"></label>' +
-            '<label class="dir-field">Cuenta crédito (Siigo)' +
-              '<input class="dir-credit" inputmode="numeric" placeholder="p. ej. 11100505" value="' + escHtml(row.credit || "") + '"></label>' +
+            '<label class="dir-field" style="flex:1">Cuenta débito · Siigo (la de este inversionista)' +
+              '<input class="dir-debit" inputmode="numeric" placeholder="p. ej. 28159001" value="' + escHtml(row.debit || "") + '"></label>' +
           '</div>' +
+          '<p style="color:var(--muted);font-size:11px;margin:7px 0 0">La cuenta <b>crédito</b> es fija para todos y se configura arriba, en <b>Contabilidad · Siigo</b>.</p>' +
         '</div>' +
       '</div>' +
       '<div class="dir-actions">' +
@@ -2826,7 +2863,7 @@ function addInvestorRow(){
   const existingNew = list.querySelector('.dir-item[data-new="1"]');
   if(existingNew){
     existingNew.scrollIntoView({ behavior:"smooth", block:"center" });
-    const n = existingNew.querySelector('.dir-nit'); if(n) n.focus();
+    const n = existingNew.querySelector('.dir-name'); if(n) n.focus();
     return;
   }
   const empty = list.querySelector('.dir-empty'); if(empty) empty.remove();
@@ -2835,7 +2872,7 @@ function addInvestorRow(){
   const node = tmp.firstElementChild;
   list.insertBefore(node, list.firstChild);
   node.scrollIntoView({ behavior:"smooth", block:"center" });
-  const n = node.querySelector('.dir-nit'); if(n) n.focus();
+  const n = node.querySelector('.dir-name'); if(n) n.focus();
 }
 
 function addMailToRow(item){
@@ -2859,10 +2896,9 @@ function readRowEmails(item){
 }
 
 async function saveDirItem(item){
-  const nit = (item.querySelector('.dir-nit').value || "").trim();
   const name = (item.querySelector('.dir-name').value || "").trim();
+  const nit = (item.querySelector('.dir-nit').value || "").trim();
   const debit = (item.querySelector('.dir-debit').value || "").trim();
-  const credit = (item.querySelector('.dir-credit').value || "").trim();
   const emails = readRowEmails(item);
   // Incluir un correo escrito pero no agregado con "+"
   const pending = (item.querySelector('.add-email-input').value || "").trim();
@@ -2870,10 +2906,10 @@ async function saveDirItem(item){
     if(!isValidEmail(pending)){ showToast("Correo no válido: " + pending, false); return; }
     if(!emails.some(e => e.toLowerCase() === pending.toLowerCase())) emails.push(pending);
   }
-  if(!nit){ showToast("Escribe el NIT del inversionista.", false); item.querySelector('.dir-nit').focus(); return; }
+  if(!name){ showToast("Escribe el nombre del inversionista.", false); item.querySelector('.dir-name').focus(); return; }
 
-  await saveDirectoryEntry(nit, { emails, name });
-  await saveSiigoAccount(nit, debit, credit);
+  await saveDirectoryEntry(name, nit, { emails });
+  await saveSiigoAccount(name, nit, debit);
   showToast("Inversionista guardado: " + (name || nit));
   renderDirectory();
   if(individualResults.length) renderIndividualResults();
@@ -2881,16 +2917,16 @@ async function saveDirItem(item){
 
 async function deleteDirItem(item){
   const isNew = item.dataset.new === "1";
-  const nit = (item.querySelector('.dir-nit').value || "").trim();
   const name = (item.querySelector('.dir-name').value || "").trim();
+  const nit = (item.querySelector('.dir-nit').value || "").trim();
   if(isNew){
     item.remove();
     if(!document.querySelector('#dirList .dir-item')) renderDirectory();
     return;
   }
   if(!window.confirm("¿Eliminar del directorio a " + (name || nit) + "?\nSe borran sus correos y cuentas guardados.")) return;
-  await deleteDirectoryEntry(nit);
-  await deleteSiigoAccount(nit);
+  await deleteDirectoryEntry(name, nit);
+  await deleteSiigoAccount(name, nit);
   showToast("Inversionista eliminado del directorio.");
   renderDirectory();
   if(individualResults.length) renderIndividualResults();
@@ -2927,15 +2963,16 @@ function initDirectory(){
 initDirectory();
 
 // Salta al directorio (pestaña Configuración) y resalta/crea la fila del inversionista.
-async function jumpToDirectory(nit, name){
-  const key = String(nit || "").trim();
-  if(key && !DIRECTORY[key]) await saveDirectoryEntry(key, { name: name || "" });
+async function jumpToDirectory(name, nit){
+  const nm = String(name || "").trim(), nt = String(nit || "").trim();
+  const id = invId(nm, nt);
+  if((nm || nt) && !DIRECTORY[id]) await saveDirectoryEntry(nm, nt, {});
   await loadDirectory(); await loadSiigoAccounts();
   DIR_FILTER = ""; const s = document.getElementById("dirSearch"); if(s) s.value = "";
   renderDirectory();
   showTab("panelConfig");
-  const sel = (window.CSS && CSS.escape) ? CSS.escape(key) : key;
-  const row = key ? document.querySelector('.dir-item[data-dir-nit="' + sel + '"]') : null;
+  const attr = idToAttr(id);
+  const row = attr ? document.querySelector('.dir-item[data-dir-id="' + attr + '"]') : null;
   if(row){
     row.scrollIntoView({ behavior:"smooth", block:"center" });
     row.classList.add("flash"); setTimeout(() => row.classList.remove("flash"), 1600);

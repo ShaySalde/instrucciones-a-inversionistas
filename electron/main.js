@@ -82,34 +82,41 @@ function makeTransport() {
   });
 }
 
-// ---- Directorio inversionista(NIT) -> correos ----------------------------------
-// directory.json: { [nit]: { emails: [..], name } }  (migra el formato antiguo { email })
-function normDirEntry(e) {
+// ---- Directorio inversionista(Nombre + NIT) -> correos -------------------------
+// directory.json: { [invId]: { name, nit, emails:[..] } }.
+// Identidad = Nombre + NIT (dos inversionistas distintos pueden compartir el mismo
+// NIT, p. ej. BTG y Skandia). Se migra el formato antiguo (clave = NIT).
+const INV_SEP = "~|~"; // separador seguro (nunca aparece en nombres ni NITs)
+function invId(name, nit) { return String(name || "").trim() + INV_SEP + String(nit || "").trim(); }
+function normEmails(e) {
   let emails = Array.isArray(e && e.emails) ? e.emails.slice() : (e && e.email ? [e.email] : []);
   emails = emails.map((x) => String(x || "").trim()).filter(Boolean);
-  emails = emails.filter((v, i) => emails.indexOf(v) === i); // sin duplicados, en orden
-  return { emails, name: (e && e.name) || "" };
+  return emails.filter((v, i) => emails.indexOf(v) === i); // sin duplicados, en orden
 }
+// Re-indexa por invId(name, nit); tolera el formato antiguo (clave = NIT, sin campo `nit`).
 function loadDirectory() {
   const raw = readJson(directoryPath(), {});
   const out = {};
-  for (const k of Object.keys(raw)) out[k] = normDirEntry(raw[k]);
+  for (const k of Object.keys(raw)) {
+    const e = raw[k] || {};
+    const name = (e.name || "").trim();
+    const nit = (e.nit !== undefined && e.nit !== null ? String(e.nit) : String(k)).trim();
+    out[invId(name, nit)] = { name, nit, emails: normEmails(e) };
+  }
   return out;
 }
 
-// Fusiona: si `emails` es undefined, conserva los actuales; si `name` es undefined, conserva el actual.
-function setDirectoryEntry({ nit, emails, email, name }) {
+// Guarda por (nombre + NIT). Si `emails` es undefined, conserva los actuales. `_delete` borra.
+function setDirectoryEntry({ name, nit, emails, _delete }) {
   const d = loadDirectory();
-  const key = String(nit || "").trim();
-  if (!key) return d;
-  const cur = d[key] || { emails: [], name: "" };
-  let newEmails = cur.emails;
-  if (emails !== undefined) newEmails = normDirEntry({ emails }).emails;
-  else if (email !== undefined) newEmails = normDirEntry({ email }).emails; // compat
-  const newName = (name !== undefined && name !== null) ? String(name).trim() : cur.name;
-  const entry = { emails: newEmails, name: newName || "" };
-  if (entry.emails.length || entry.name) d[key] = entry;
-  else delete d[key];
+  const nm = String(name || "").trim();
+  const nt = String(nit || "").trim();
+  if (!nm && !nt) return d;
+  const id = invId(nm, nt);
+  if (_delete) { delete d[id]; writeJson(directoryPath(), d); return d; }
+  const cur = d[id] || { name: nm, nit: nt, emails: [] };
+  const newEmails = (emails !== undefined) ? normEmails({ emails }) : cur.emails;
+  d[id] = { name: nm, nit: nt, emails: newEmails };
   writeJson(directoryPath(), d);
   return d;
 }
@@ -117,13 +124,44 @@ function setDirectoryEntry({ nit, emails, email, name }) {
 function importDirectory(entries) {
   const d = loadDirectory();
   for (const e of entries || []) {
-    const key = String(e.nit || "").trim();
-    if (!key) continue;
-    const entry = normDirEntry(e);
-    if (entry.emails.length || entry.name) d[key] = entry;
+    const nm = String(e.name || "").trim();
+    const nt = String(e.nit || "").trim();
+    if (!nm && !nt) continue;
+    d[invId(nm, nt)] = { name: nm, nit: nt, emails: normEmails(e) };
   }
   writeJson(directoryPath(), d);
   return d;
+}
+
+// Migración única: re-indexa directorio y cuentas Siigo al formato { [invId]: ... }.
+function migrateStoresOnce() {
+  try {
+    const dRaw = readJson(directoryPath(), {});
+    const dKeys = Object.keys(dRaw);
+    if (dKeys.length && !dKeys.every((k) => k.indexOf(INV_SEP) !== -1)) {
+      writeJson(directoryPath(), loadDirectory()); // loadDirectory ya re-indexa a invId
+    }
+  } catch (_) {}
+  try {
+    const sRaw = readJson(siigoAccountsPath(), {});
+    const sKeys = Object.keys(sRaw);
+    if (sKeys.length && !sKeys.every((k) => k.indexOf(INV_SEP) !== -1)) {
+      const dir = loadDirectory(); // { invId: {name, nit, emails} }
+      const nameByNit = {};
+      for (const id of Object.keys(dir)) {
+        const e = dir[id];
+        if (e.nit && e.name && !nameByNit[e.nit]) nameByNit[e.nit] = e.name;
+      }
+      const out = {};
+      for (const k of sKeys) {
+        if (k.indexOf(INV_SEP) !== -1) { out[k] = sRaw[k]; continue; }
+        const nit = String(k).trim();
+        const name = nameByNit[nit] || "";
+        out[invId(name, nit)] = Object.assign({ name, nit }, sRaw[k]);
+      }
+      writeJson(siigoAccountsPath(), out);
+    }
+  } catch (_) {}
 }
 
 // ==============================================================================
@@ -142,9 +180,12 @@ function getSiigoConfigPublic() {
     username: s.siigoUsername || "",
     hasAccessKey: !!(s.siigoAccessKeyEnc || s.siigoAccessKeyPlain),
     documentId: s.siigoDocumentId || "",
-    nitLine: s.siigoNitLine || "both",
+    creditAccount: s.siigoCreditAccount || "",   // cuenta crédito fija (p. ej. 11200507)
+    creditNit: s.siigoCreditNit || "",           // tercero fijo de la línea crédito (sin DV)
   };
 }
+// NIT sin dígito de verificación (900.123.456-1 -> 900123456)
+function nitNoDV(nit) { return String(nit || "").split("-")[0].replace(/\D/g, ""); }
 function getSiigoAccessKey() {
   const s = loadSettingsRaw();
   if (s.siigoAccessKeyEnc) {
@@ -155,12 +196,13 @@ function getSiigoAccessKey() {
   }
   return s.siigoAccessKeyPlain || "";
 }
-function saveSiigoConfig({ partnerId, username, accessKey, documentId, nitLine }) {
+function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit }) {
   const s = loadSettingsRaw();
   s.siigoPartnerId = (partnerId || "").trim();
   s.siigoUsername = (username || "").trim();
   if (documentId !== undefined) s.siigoDocumentId = String(documentId || "").trim();
-  if (nitLine !== undefined) s.siigoNitLine = nitLine || "both";
+  if (creditAccount !== undefined) s.siigoCreditAccount = String(creditAccount || "").trim();
+  if (creditNit !== undefined) s.siigoCreditNit = nitNoDV(creditNit);
   if (typeof accessKey === "string" && accessKey.trim().length) {
     const k = accessKey.trim();
     delete s.siigoAccessKeyPlain;
@@ -172,18 +214,22 @@ function saveSiigoConfig({ partnerId, username, accessKey, documentId, nitLine }
   return getSiigoConfigPublic();
 }
 
-// Cuentas contables por NIT: { [nit]: { debit, credit } }
+// Cuentas contables por inversionista (Nombre + NIT): { [invId]: { name, nit, debit, credit } }
 function loadSiigoAccounts() { return readJson(siigoAccountsPath(), {}); }
-function setSiigoAccount({ nit, debit, credit }) {
+function setSiigoAccount({ name, nit, debit, credit }) {
   const d = loadSiigoAccounts();
-  const key = String(nit || "").trim();
-  if (!key) return d;
+  const nm = String(name || "").trim();
+  const nt = String(nit || "").trim();
+  if (!nm && !nt) return d;
+  const key = invId(nm, nt);
   const cur = d[key] || {};
-  d[key] = {
+  const entry = {
+    name: nm, nit: nt,
     debit: (debit != null ? String(debit).trim() : (cur.debit || "")),
     credit: (credit != null ? String(credit).trim() : (cur.credit || "")),
   };
-  if (!d[key].debit && !d[key].credit) delete d[key];
+  if (!entry.debit && !entry.credit) delete d[key];
+  else d[key] = entry;
   writeJson(siigoAccountsPath(), d);
   return d;
 }
@@ -287,27 +333,37 @@ ipcMain.handle("siigo:createJournal", async (_e, p) => {
     const p2 = p || {};
     const docId = p2.documentId || s.siigoDocumentId;
     if (!docId) return { ok: false, error: "Falta el tipo de comprobante (configúralo en Siigo)." };
-    if (!p2.debit || !p2.credit) return { ok: false, error: "Faltan las cuentas débito/crédito de este inversionista." };
+
+    // Débito = cuenta del inversionista + NIT del inversionista (sin dígito de verificación).
+    // Crédito = cuenta y tercero FIJOS (globales, configurados en la pantalla de Siigo).
+    const debitAccount  = String(p2.debit || "").trim();
+    const creditAccount = String(p2.creditAccount || s.siigoCreditAccount || "").trim();
+    const creditNit     = nitNoDV(p2.creditNit || s.siigoCreditNit || "");
+    const investorNit   = nitNoDV(p2.nit || "");
+    if (!debitAccount) return { ok: false, error: "Falta la cuenta débito de este inversionista (configúrala en el directorio)." };
+    if (!creditAccount) return { ok: false, error: "Falta la cuenta crédito fija (configúrala en la pantalla de Siigo)." };
+    if (!creditNit) return { ok: false, error: "Falta el tercero de la línea crédito (configúralo en la pantalla de Siigo)." };
+
     const v = Number(p2.value);
     if (!(v > 0)) return { ok: false, error: "El monto debe ser mayor que cero." };
     if (!p2.date) return { ok: false, error: "Falta la fecha del comprobante." };
 
-    const line = p2.nitLine || s.siigoNitLine || "both";
-    const ident = String(p2.nit || "").trim();
-    const desc = "Monto instruido " + (p2.name || "");
-    const mkItem = (code, movement, withCust) => {
-      const it = { account: { code: String(code).trim(), movement }, value: v, description: desc };
-      if (withCust && ident) it.customer = { identification: ident, branch_office: 0 };
-      return it;
-    };
+    // Fecha para la descripción: D/MM/YYYY (p. ej. 3/08/2026)
+    const md = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(p2.date));
+    const fechaTxt = md ? (Number(md[3]) + "/" + md[2] + "/" + md[1]) : String(p2.date);
+    let desc = "Restitución de cartera recaudada " + (p2.name || "") + " Instrucción (" + fechaTxt + ")";
+    if (desc.length > 100) desc = desc.slice(0, 100);
+
     const payload = {
       document: { id: Number(docId) },
       date: p2.date,
       items: [
-        mkItem(p2.debit, "Debit", line === "debit" || line === "both"),
-        mkItem(p2.credit, "Credit", line === "credit" || line === "both"),
+        { account: { code: debitAccount, movement: "Debit" }, value: v, description: desc,
+          customer: { identification: investorNit || creditNit, branch_office: 0 } },
+        { account: { code: creditAccount, movement: "Credit" }, value: v, description: desc,
+          customer: { identification: creditNit, branch_office: 0 } },
       ],
-      observations: "Registrado desde Instrucciones a Inversionistas · " + (p2.name || "") + (ident ? (" · NIT " + ident) : ""),
+      observations: desc,
     };
     const r = await siigoFetch("/v1/journals", { method: "POST", body: JSON.stringify(payload) });
     if (!r.ok) return { ok: false, error: siigoErr(r) };
@@ -339,7 +395,10 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  try { migrateStoresOnce(); } catch (_) {}
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
