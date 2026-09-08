@@ -3023,10 +3023,16 @@ function dirItemHTML(row, isNew){
   const chips = (row.emails || []).map(mailChipHTML).join("");
   const id = invId(row.name, row.nit);
   return '<div class="dir-item' + (isNew ? ' flash' : '') + '" data-dir-id="' + escHtml(idToAttr(id)) + '"' + (isNew ? ' data-new="1"' : '') + '>' +
+      ((!isNew && (row.name || row.nit))
+        ? '<div class="dir-title" title="' + escHtml(row.name || "") + '" style="font-weight:600;font-size:14px;color:var(--ink);line-height:1.35;margin:0 0 14px;word-break:break-word">' +
+            escHtml(row.name || "(sin nombre)") +
+            '<span style="font-weight:500;font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap">NIT ' + escHtml(row.nit || "—") + '</span>' +
+          '</div>'
+        : '') +
       '<div class="dir-grid">' +
         '<div>' +
           '<label class="dir-field">Nombre del inversionista' +
-            '<input class="dir-name" placeholder="p. ej. BTG PACTUAL" value="' + escHtml(row.name || "") + '"' + ro + '></label>' +
+            '<input class="dir-name" placeholder="p. ej. BTG PACTUAL" title="' + escHtml(row.name || "") + '" value="' + escHtml(row.name || "") + '"' + ro + '></label>' +
           '<label class="dir-field">NIT' +
             '<input class="dir-nit" inputmode="numeric" placeholder="NIT" value="' + escHtml(row.nit || "") + '"' + ro + '></label>' +
         '</div>' +
