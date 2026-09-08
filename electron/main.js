@@ -133,6 +133,35 @@ function importDirectory(entries) {
   return d;
 }
 
+// Inversionistas que vienen de fábrica (Nombre + NIT). Sin correos ni cuentas:
+// esos los completa el usuario en la app. Dos pares comparten NIT a propósito.
+const DEFAULT_INVESTORS = [
+  ["CREDICORP CAPITAL DERECHOS ECONÓMICOS 2026", "901238753"],
+  ['FONDO DE INVERSION COLECTIVA CERRADO "BTG PACTUAL CREDITO" II', "900155109"],
+  ["Liquitech S.A.S", "901228343"],
+  ["PATRIMONIOS AUTÓNOMOS SKANDIA SOCIEDAD FIDUCIARIA - PA LIQUITECH ALIANZA", "830057062"],
+  ["PATRIMONIOS AUTONOMOS SKANDIA SOCIEDAD FIDUCIARIA S.A.", "830057062"],
+  ["SEMPLI S.A.S", "900995954"],
+  ["CREDICORP CAPITAL FACTORING", "900192261"],
+  ['FONDO DE INVERSION COLECTIVA CERRADO "BTG PACTUAL CREDITO"', "900155109"],
+  ["Tinello Capital S A S", "900884741"],
+  ["BANCO DE OCCIDENTE S.A", "890300279"],
+  ["VESTAS S.A.S", "900579376"],
+];
+
+// Siembra el directorio con los inversionistas de fábrica SOLO en la primera
+// ejecución (cuando aún no existe directory.json). Después el usuario manda:
+// no se re-siembra ni se “resucita” lo que borre.
+function seedDirectoryOnce() {
+  const p = directoryPath();
+  if (fs.existsSync(p)) return;
+  const d = {};
+  for (const [name, nit] of DEFAULT_INVESTORS) {
+    d[invId(name, nit)] = { name: name.trim(), nit: String(nit).trim(), emails: [] };
+  }
+  writeJson(p, d);
+}
+
 // Migración única: re-indexa directorio y cuentas Siigo al formato { [invId]: ... }.
 function migrateStoresOnce() {
   try {
@@ -436,6 +465,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  try { seedDirectoryOnce(); } catch (_) {}
   try { migrateStoresOnce(); } catch (_) {}
   createWindow();
 });
