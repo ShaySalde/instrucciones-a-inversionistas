@@ -2,3 +2,10 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Datos sensibles: payment tapes y ejemplos con NITs/montos reales — nunca subir
+Ejemplo registros de instrucciones a Inversionistas.xlsx
+payment_tape*.csv
+payment_tape*.xlsx
+*_Distribuido.xlsx
+renderer/__tmp_*
