@@ -182,6 +182,7 @@ function getSiigoConfigPublic() {
     documentId: s.siigoDocumentId || "",
     creditAccount: s.siigoCreditAccount || "",   // cuenta crédito fija (p. ej. 11200507)
     creditNit: s.siigoCreditNit || "",           // tercero fijo de la línea crédito (sin DV)
+    bankDebitAccount: s.siigoBankDebitAccount || "", // cuenta débito para abonos a crédito (banco, p. ej. 21052504)
   };
 }
 // NIT sin dígito de verificación (900.123.456-1 -> 900123456)
@@ -196,13 +197,14 @@ function getSiigoAccessKey() {
   }
   return s.siigoAccessKeyPlain || "";
 }
-function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit }) {
+function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount }) {
   const s = loadSettingsRaw();
   s.siigoPartnerId = (partnerId || "").trim();
   s.siigoUsername = (username || "").trim();
   if (documentId !== undefined) s.siigoDocumentId = String(documentId || "").trim();
   if (creditAccount !== undefined) s.siigoCreditAccount = String(creditAccount || "").trim();
   if (creditNit !== undefined) s.siigoCreditNit = nitNoDV(creditNit);
+  if (bankDebitAccount !== undefined) s.siigoBankDebitAccount = String(bankDebitAccount || "").trim();
   if (typeof accessKey === "string" && accessKey.trim().length) {
     const k = accessKey.trim();
     delete s.siigoAccessKeyPlain;
@@ -333,6 +335,44 @@ ipcMain.handle("siigo:createJournal", async (_e, p) => {
     const p2 = p || {};
     const docId = p2.documentId || s.siigoDocumentId;
     if (!docId) return { ok: false, error: "Falta el tipo de comprobante (configúralo en Siigo)." };
+
+    const md0 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(p2.date || ""));
+    const fechaTxt0 = md0 ? (Number(md0[3]) + "/" + md0[2] + "/" + md0[1]) : String(p2.date || "");
+    const trunc100 = (t) => (t.length > 100 ? t.slice(0, 100) : t);
+
+    // ---- Modo BANCO (abono a crédito financiero): crédito total + un débito por obligación ----
+    if (p2.mode === "bank") {
+      const creditAccount = String(p2.creditAccount || s.siigoCreditAccount || "").trim();
+      const creditNit = nitNoDV(p2.creditNit || s.siigoCreditNit || "");
+      const debitAccount = String(p2.bankDebitAccount || s.siigoBankDebitAccount || "").trim();
+      const fuenteNit = nitNoDV(p2.fuenteNit || "");
+      const fuente = p2.fuenteName || "";
+      const lines = (Array.isArray(p2.lines) ? p2.lines : [])
+        .map((l) => ({ obligacion: String(l.obligacion || "").trim(), value: Number(l.value) || 0 }))
+        .filter((l) => l.value > 0);
+      if (!creditAccount || !creditNit) return { ok: false, error: "Falta la cuenta/tercero de crédito fijos (configúralos en Siigo)." };
+      if (!debitAccount) return { ok: false, error: "Falta la cuenta débito para abonos a crédito (configúrala en Siigo)." };
+      if (!fuenteNit) return { ok: false, error: "Falta el NIT de la fuente de fondeo." };
+      if (!lines.length) return { ok: false, error: "No hay obligaciones con monto para registrar." };
+      if (!p2.date) return { ok: false, error: "Falta la fecha del comprobante." };
+      let total = 0; for (const l of lines) total += l.value;
+      if (!(total > 0)) return { ok: false, error: "El total debe ser mayor que cero." };
+      const numbers = lines.map((l) => l.obligacion).filter(Boolean).join("-");
+      const creditDesc = trunc100("Abono a crédito financiero " + fuente + " No. " + numbers);
+      const items = [
+        { account: { code: creditAccount, movement: "Credit" }, value: total, description: creditDesc, customer: { identification: creditNit, branch_office: 0 } },
+        ...lines.map((l) => ({
+          account: { code: debitAccount, movement: "Debit" }, value: l.value,
+          description: trunc100("Abono a crédito financiero " + fuente + " No. " + l.obligacion),
+          customer: { identification: fuenteNit, branch_office: 0 },
+        })),
+      ];
+      const payloadB = { document: { id: Number(docId) }, date: p2.date, items, observations: creditDesc };
+      const rb = await siigoFetch("/v1/journals", { method: "POST", body: JSON.stringify(payloadB) });
+      if (!rb.ok) return { ok: false, error: siigoErr(rb) };
+      const db = rb.data || {};
+      return { ok: true, id: db.id, number: db.number || db.name || (db.document && db.document.number) || db.id };
+    }
 
     // Débito = cuenta del inversionista + NIT del inversionista (sin dígito de verificación).
     // Crédito = cuenta y tercero FIJOS (globales, configurados en la pantalla de Siigo).

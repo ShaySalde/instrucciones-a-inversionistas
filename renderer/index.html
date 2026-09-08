@@ -307,6 +307,20 @@
     font-weight:600;padding:2px 4px;border-radius:6px}
   .linklike:hover{text-decoration:underline}
   .linklike:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+
+  /* ===== Banco (abono a crédito): tabla de operaciones con N° de obligación ===== */
+  .inv-card.bank-card{border-color:#cfe0fb;box-shadow:0 0 0 1px #dbe7fc, var(--shadow-sm)}
+  .inv-card.bank-card .siigo-tag{background:#e7effe;color:#2b57c9;border:1px solid #cfe0fb;border-radius:999px;padding:2px 9px;font-size:11px}
+  .bank-ops{margin-top:11px;border:1px solid var(--hairline);border-radius:12px;overflow:hidden;background:#fff}
+  .bank-op-row{display:grid;grid-template-columns:1.3fr 1fr 1.4fr;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--hairline)}
+  .bank-op-row:first-child{border-top:0}
+  .bank-op-head{background:var(--tint);font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+  .bank-op-row .bo-op{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .bank-op-row .bo-val{font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
+  .bank-op-head .bo-val{text-align:right}
+  .bank-op-row .bo-oblig{border:1px solid var(--hairline);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#fff}
+  .bank-op-row .bo-oblig:focus-visible{outline:none;border-color:var(--accent)!important;box-shadow:0 0 0 3px var(--ring)}
+  @media (max-width:560px){ .bank-op-row{grid-template-columns:1fr} .bank-op-row .bo-val{text-align:left} }
 </style>
 </head>
 <body>
@@ -396,6 +410,10 @@
       </label>
       <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Tercero de la línea crédito (NIT, sin DV)
         <input type="text" id="sgCreditNit" inputmode="numeric" placeholder="p. ej. 890903938" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta débito · abonos a crédito (banco)
+        <input type="text" id="sgBankDebit" inputmode="numeric" placeholder="p. ej. 21052504" autocomplete="off"
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
@@ -1623,13 +1641,6 @@ async function runDistribuir(){
 
   const { src, dat } = parsePaymentTape(wb);
 
-  // Índices clave dentro del target
-  const iInv = DIST_TARGETS.indexOf("Inversionista_beneficiario");
-  const iTot = DIST_TARGETS.indexOf("Total para inversionista");
-  const iMar = DIST_TARGETS.indexOf("Margen Liquitech");
-  const iSal = DIST_TARGETS.indexOf("Saldo a favor/ contra");
-  const iRec = DIST_TARGETS.indexOf("Valor recibido");
-
   // Borrar hojas generadas previas del libro
   const toDelete = wb.SheetNames.filter(isGeneratedName);
   for(const name of toDelete){
@@ -1647,111 +1658,8 @@ async function runDistribuir(){
   wsBase["!cols"] = colWidths(DIST_TARGETS, dat);
   insertSheet(wb, wsBase, "Base Distribuida", src.name);
 
-  // ---- 2) Agrupar por Inversionista_beneficiario ----
-  const grp = new Map();
-  for(const r of dat){
-    let nm = String((r[iInv] ?? "")).trim();
-    if(!nm) nm = "(sin inversionista)";
-    let g = grp.get(nm);
-    if(!g){ g = { name: nm, cant: 0, tot: 0, mar: 0, sal: 0, rec: 0 }; grp.set(nm, g); }
-    g.cant++;
-    g.tot += val0(r[iTot]); g.mar += val0(r[iMar]);
-    g.sal += val0(r[iSal]); g.rec += val0(r[iRec]);
-  }
-  const groups = Array.from(grp.values()).sort((a,b) => b.tot - a.tot);
-  log("• Inversionistas distintos: " + groups.length);
-
-  // ---- 3) Tabla Inversionistas (título A1, header fila 3) ----
-  log("▶ Generando \"Tabla Inversionistas\"…", "step");
-  const pivotAOA = [];
-  pivotAOA.push(["Distribución por Inversionista"]);
-  pivotAOA.push([]);
-  pivotAOA.push(["Inversionista_beneficiario","Cantidad",
-    "Suma de Total para inversionista","Suma de Margen Liquitech",
-    "Suma de Saldo a favor/ contra","Suma de Valor recibido"]);
-  for(const g of groups) pivotAOA.push([g.name, g.cant, g.tot, g.mar, g.sal, g.rec]);
-  const lastDataRow = pivotAOA.length; // 1-based (última fila de datos antes del total)
-  pivotAOA.push(["Total general",
-    { f: `SUM(B4:B${lastDataRow})` },
-    { f: `SUM(C4:C${lastDataRow})` },
-    { f: `SUM(D4:D${lastDataRow})` },
-    { f: `SUM(E4:E${lastDataRow})` },
-    { f: `SUM(F4:F${lastDataRow})` }]);
-
-  const wsPivot = XLSX.utils.aoa_to_sheet(pivotAOA);
-  const totalRow = pivotAOA.length; // 1-based
-  const cantFmt = "#,##0";
-  const amtFmt  = "#,##0.00;[Red](#,##0.00)";
-  for(let r = 4; r <= totalRow; r++){
-    const addrB = XLSX.utils.encode_cell({r: r-1, c: 1});
-    if(wsPivot[addrB]){ wsPivot[addrB].t = "n"; wsPivot[addrB].z = cantFmt; }
-    for(let c = 2; c <= 5; c++){
-      const addr = XLSX.utils.encode_cell({r: r-1, c});
-      if(wsPivot[addr]){ wsPivot[addr].t = "n"; wsPivot[addr].z = amtFmt; }
-    }
-  }
-  wsPivot["!cols"] = [{wch:40},{wch:12},{wch:26},{wch:22},{wch:22},{wch:22}];
-  insertSheet(wb, wsPivot, "Tabla Inversionistas");
-
-  // ---- 3b) Instruccion: pivot "Etiquetas de fila / Suma de Total para inversionista" ----
-  log("▶ Generando \"Instruccion\" (tabla dinámica por Nombre Inversionista)…", "step");
-  const iInvName = DIST_TARGETS.indexOf("Nombre Inversionista");
-  const iFuente  = DIST_TARGETS.indexOf("Nombre fuente de fondeo");
-  const { rows: instrRows, grand: instrGrand } = buildInstruccionRows(dat, iInvName, iFuente, iTot);
-
-  const instrAOA = [["Etiquetas de fila", "Suma de Total para inversionista"]];
-  for(const row of instrRows){
-    instrAOA.push([(row.indent ? "  " : "") + row.label, row.total]);
-  }
-  instrAOA.push(["Total general", instrGrand]);
-
-  const wsInstr = XLSX.utils.aoa_to_sheet(instrAOA);
-  const instrCurFmt = '"$ "#,##0.00';
-  for(let r = 1; r < instrAOA.length; r++){
-    const addr = XLSX.utils.encode_cell({ r, c: 1 });
-    if(wsInstr[addr]){ wsInstr[addr].t = "n"; wsInstr[addr].z = instrCurFmt; }
-  }
-  wsInstr["!cols"] = [{ wch: 55 }, { wch: 26 }];
-  insertSheet(wb, wsInstr, "Instruccion", "Tabla Inversionistas");
-  log("• Inversionistas (filas 4-" + (instrRows.length + 3) + "): " + instrRows.length + " · fila Total general añadida");
-  log("• Las filas 14 en adelante (saldos, márgenes, valor a girar) no se generan — complétalas a mano, dependen de datos externos al payment tape.", "warn");
-
-  // ---- 4) Hojas Det_<inversionista> ----
-  log("▶ Generando " + groups.length + " hojas de detalle Det_…", "step");
-  const usedNames = new Set();
-  for(const g of groups){
-    const sheetName = safeSheetName(DIST_GENERATED_PREFIX + g.name, usedNames, wb.SheetNames);
-    const detRows = dat.filter(r => {
-      let nm = String((r[iInv] ?? "")).trim();
-      if(!nm) nm = "(sin inversionista)";
-      return nm === g.name;
-    });
-
-    const detAOA = [];
-    detAOA.push(["Detalles para Suma de Total para inversionista - Inversionista_beneficiario: " + g.name]);
-    detAOA.push([]);
-    detAOA.push(DIST_TARGETS);
-    for(const r of detRows) detAOA.push(r);
-    const detTotalRow = detAOA.length + 1; // 1-based
-    const totalRowArr = new Array(DIST_TARGETS.length).fill("");
-    totalRowArr[0] = "Total";
-    if(iTot >= 0){
-      totalRowArr[iTot] = { f: `SUM(${colLetter(iTot+1)}4:${colLetter(iTot+1)}${detTotalRow-1})` };
-    }
-    detAOA.push(totalRowArr);
-
-    const wsDet = XLSX.utils.aoa_to_sheet(detAOA, { cellDates:true });
-    // Formatos numéricos: header fila 3, datos fila 4..(detTotalRow-1)
-    applyFormats(wsDet, 3, detRows.length, DIST_TARGETS);
-    // Formato al total de iTot
-    if(iTot >= 0){
-      const totalAddr = XLSX.utils.encode_cell({r: detTotalRow-1, c: iTot});
-      if(wsDet[totalAddr]){ wsDet[totalAddr].t = "n"; wsDet[totalAddr].z = amtFmt; }
-    }
-    wsDet["!cols"] = colWidths(DIST_TARGETS, detRows);
-    wsDet["!freeze"] = { xSplit: 0, ySplit: 3 };
-    insertSheet(wb, wsDet, sheetName);
-  }
+  // El entregable solo conserva la hoja original + "Base Distribuida".
+  // Las hojas Tabla Inversionistas, Instruccion y Det_<inversionista> ya no se generan.
 
   // Salida
   log("▶ Generando archivo de salida…", "step");
@@ -1940,26 +1848,40 @@ async function runIndividual(){
   if(missing.length) log("• Columnas no encontradas en el target: " + missing.join(", "), "warn");
 
   // Agrupar filas (ya mapeadas a las 69 columnas canónicas) por Nombre Inversionista
-  const grp = new Map();
+  const iFuente    = DIST_TARGETS.indexOf("Nombre fuente de fondeo");
+  const iNitFuente = DIST_TARGETS.indexOf("NIT fuente de fondeo");
+  const iNoOp      = DIST_TARGETS.indexOf("No Operación");
+  const iVP        = DIST_TARGETS.indexOf("Valor a pagar");
+  const iNitInv    = INDIV_COLS.indexOf("NIT inversionista"); // índice dentro de `filtered`
+
+  // Partición: fuente de fondeo vacía = restitución al inversionista; con valor = abono a crédito (banco)
+  const grp = new Map();      // Nombre Inversionista -> filas
+  const bankGrp = new Map();  // Nombre fuente de fondeo -> filas
   for(const r of dat){
-    let nm = String((r[iInvName] ?? "")).trim();
-    if(!nm) nm = "(sin inversionista)";
-    if(!grp.has(nm)) grp.set(nm, []);
-    grp.get(nm).push(r);
+    const fuente = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
+    if(fuente){
+      if(!bankGrp.has(fuente)) bankGrp.set(fuente, []);
+      bankGrp.get(fuente).push(r);
+    } else {
+      let nm = String((r[iInvName] ?? "")).trim();
+      if(!nm) nm = "(sin inversionista)";
+      if(!grp.has(nm)) grp.set(nm, []);
+      grp.get(nm).push(r);
+    }
   }
   const investors = Array.from(grp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
-  log("• Inversionistas distintos: " + investors.length);
+  const banks = Array.from(bankGrp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
+  log("• Inversionistas: " + investors.length + " · Fuentes de fondeo (abono a crédito): " + banks.length);
 
   individualResults = [];
+  // --- Inversionistas (restitución de cartera) ---
   for(const nm of investors){
     const rows = grp.get(nm);
     const filtered = rows.map(r => colIdx.map(i => i >= 0 ? r[i] : null));
-    // NIT del inversionista (clave estable del directorio de correos)
-    const iNitLocal = INDIV_COLS.indexOf("NIT inversionista");
     let nit = "";
-    if(iNitLocal >= 0){
+    if(iNitInv >= 0){
       for(const fr of filtered){
-        const v = fr[iNitLocal];
+        const v = fr[iNitInv];
         if(v != null && String(v).trim() !== ""){ nit = String(v).trim(); break; }
       }
     }
@@ -1971,8 +1893,30 @@ async function runIndividual(){
     const fileName = "Reporte - " + safeName + ".xlsx";
     const alerts = computeDateAlerts(filtered);
 
-    individualResults.push({ name: nm, nit, count: rows.length, total, blob, fileName, filtered, alerts });
+    individualResults.push({ kind:"investor", name: nm, nit, count: rows.length, total, blob, fileName, filtered, alerts });
     log("• " + nm + ": " + rows.length + " operación(es) · " + fmtCOP(total));
+  }
+  // --- Banco (abono a crédito financiero) — agrupado por No Operación ---
+  for(const fuente of banks){
+    const rows = bankGrp.get(fuente);
+    let fuenteNit = "";
+    for(const r of rows){
+      const v = iNitFuente >= 0 ? r[iNitFuente] : null;
+      if(v != null && String(v).trim() !== ""){ fuenteNit = String(v).trim(); break; }
+    }
+    const opMap = new Map(); // No Operación -> { noOp, valor }
+    let total = 0;
+    for(const r of rows){
+      const noOp = iNoOp >= 0 ? String(r[iNoOp] ?? "").trim() : "";
+      const vp = iVP >= 0 ? val0(r[iVP]) : 0;
+      const key = noOp || "(sin operación)";
+      if(!opMap.has(key)) opMap.set(key, { noOp: key, valor: 0 });
+      opMap.get(key).valor += vp;
+      total += vp;
+    }
+    const ops = Array.from(opMap.values());
+    individualResults.push({ kind:"bank", name: fuente, nit: fuenteNit, count: ops.length, total, ops, obligByOp: {} });
+    log("• [Abono a crédito] " + fuente + ": " + ops.length + " operación(es) · " + fmtCOP(total));
   }
 
   await renderIndividualResults();
@@ -2096,7 +2040,49 @@ function alertBlockHTML(r, invIdx){
     '</div>';
 }
 
-// Guarda en el directorio los correos actualmente escritos (evita perderlos al re-renderizar)
+// ---- Banco (abono a crédito): tabla de operaciones con N° de obligación manual ----
+function bankOpsHTML(r, idx){
+  const rows = (r.ops || []).map(op => {
+    const oblig = (r.obligByOp && r.obligByOp[op.noOp]) || "";
+    return '<div class="bank-op-row">' +
+        '<span class="bo-op">' + escHtml(op.noOp) + '</span>' +
+        '<span class="bo-val">' + escHtml(fmtCOP(op.valor)) + '</span>' +
+        '<input class="bo-oblig" data-idx="' + idx + '" data-op="' + escHtml(op.noOp) + '" placeholder="N° de obligación" value="' + escHtml(oblig) + '">' +
+      '</div>';
+  }).join("");
+  return '<div class="bank-ops">' +
+      '<div class="bank-op-row bank-op-head"><span class="bo-op">Operación</span><span class="bo-val">Valor a pagar</span><span class="bo-oblig-h">N° de obligación</span></div>' +
+      rows +
+    '</div>';
+}
+
+// Correo de abono a crédito: agrupa las operaciones por N° de obligación (sin adjuntar Excel).
+function buildBankEmailDraft(r){
+  const today = new Date();
+  const fecha = today.toLocaleDateString("es-CO", { day:"2-digit", month:"long", year:"numeric" });
+  const subject = "Instrucción traslado de recursos / PA LIQUITECH SKANDIA – " + r.name + " – " + fecha;
+  const groups = new Map();
+  for(const op of (r.ops || [])){
+    const num = ((r.obligByOp && r.obligByOp[op.noOp]) || "").trim() || "(sin N° de obligación)";
+    if(!groups.has(num)) groups.set(num, { total:0, ops:[] });
+    const g = groups.get(num); g.total += op.valor; g.ops.push(op);
+  }
+  const blocks = [];
+  let grand = 0;
+  for(const [num, g] of groups){
+    blocks.push("Obligación " + num + " — " + fmtCOP(g.total));
+    grand += g.total;
+  }
+  const body =
+"Estimado(a) " + r.name + ",\n\n" +
+"Adjunto la instrucción de traslado de recursos por las siguientes obligaciones:\n\n" +
+blocks.join("\n\n") + "\n\n" +
+"Total: " + fmtCOP(grand) + "\n\n" +
+"Quedamos atentos a cualquier inquietud.\n\n" +
+"Cordialmente,";
+  return { subject, body };
+}
+
 // Agrega al directorio los inversionistas nuevos que aparecen al procesar un archivo (por Nombre + NIT).
 async function syncInvestorsToDirectory(){
   let added = false;
@@ -2112,7 +2098,7 @@ async function renderIndividualResults(){
   await loadSiigoAccounts();
   const added = await syncInvestorsToDirectory();
   if(added && typeof renderDirectory === "function") renderDirectory();
-  individualResults.forEach(r => { r.alerts = computeDateAlerts(r.filtered); });
+  individualResults.forEach(r => { r.alerts = (r.kind === "bank") ? [] : computeDateAlerts(r.filtered); });
   const totalAlerts = individualResults.reduce((n, r) => n + (r.alerts ? r.alerts.length : 0), 0);
   const invWithAlerts = individualResults.filter(r => r.alerts && r.alerts.length).length;
 
@@ -2158,13 +2144,37 @@ async function renderIndividualResults(){
   }
 
   individualResults.forEach((r, idx) => {
-    const draft = buildEmailDraft(r.name, r.count, r.total);
     const emails = dirEmailsFor(r.name, r.nit);
     const emailsHtml = emails.length
       ? '<div class="inv-emails-ro">' + emails.map(e => '<span class="ro-chip">' + escHtml(e) + '</span>').join("") + '</div>'
       : '<span class="ro-missing">Sin correo configurado</span>';
-    const hasAlert = r.alerts && r.alerts.length;
+    const cfgBtn = '<button class="linklike" data-act="cfg-mail" data-idx="' + idx + '" style="margin-left:auto">⚙ ' + (emails.length ? 'Editar' : 'Configurar') + '</button>';
     const card = document.createElement("div");
+
+    if(r.kind === "bank"){
+      const draft = buildBankEmailDraft(r);
+      card.className = "inv-card bank-card";
+      card.innerHTML =
+        '<div class="inv-top">' +
+          '<span class="inv-name">' + escHtml(r.name) + ' <span class="siigo-tag">Abono a crédito</span></span>' +
+          '<span class="inv-meta">NIT ' + escHtml(r.nit || "—") + ' · ' + r.count + ' operación(es) · ' + escHtml(fmtCOP(r.total)) + '</span>' +
+        '</div>' +
+        bankOpsHTML(r, idx) +
+        '<div class="inv-email"><span class="inv-label">Correo:</span>' + emailsHtml + cfgBtn + '</div>' +
+        '<div class="inv-actions">' +
+          '<button class="btn ok" data-act="send" data-idx="' + idx + '">📧 Enviar</button>' +
+          '<button class="btn ghost-dark" data-act="copy" data-idx="' + idx + '">📋 Copiar</button>' +
+          '<span class="inv-state" data-state="' + idx + '" style="font-size:12.5px;font-weight:600;align-self:center"></span>' +
+        '</div>' +
+        siigoCardHTML(r, idx) +
+        '<textarea readonly data-idx="' + idx + '">Asunto: ' + draft.subject + '\n\n' + draft.body + '</textarea>';
+      list.appendChild(card);
+      return;
+    }
+
+    // --- Inversionista (restitución) ---
+    const draft = buildEmailDraft(r.name, r.count, r.total);
+    const hasAlert = r.alerts && r.alerts.length;
     card.className = "inv-card" + (hasAlert ? " has-alert" : "");
     card.innerHTML =
       '<div class="inv-top">' +
@@ -2172,11 +2182,7 @@ async function renderIndividualResults(){
         '<span class="inv-meta">NIT ' + escHtml(r.nit || "—") + ' · ' + r.count + ' operación(es) · ' + escHtml(fmtCOP(r.total)) + '</span>' +
       '</div>' +
       (hasAlert ? alertBlockHTML(r, idx) : '') +
-      '<div class="inv-email">' +
-        '<span class="inv-label">Correo:</span>' +
-        emailsHtml +
-        '<button class="linklike" data-act="cfg-mail" data-idx="' + idx + '" style="margin-left:auto">⚙ ' + (emails.length ? 'Editar' : 'Configurar') + '</button>' +
-      '</div>' +
+      '<div class="inv-email"><span class="inv-label">Correo:</span>' + emailsHtml + cfgBtn + '</div>' +
       '<div class="inv-actions">' +
         '<button class="btn ok" data-act="send" data-idx="' + idx + '">📧 Enviar</button>' +
         '<button class="btn" data-act="dl" data-idx="' + idx + '">⬇ Descargar</button>' +
@@ -2218,6 +2224,19 @@ async function renderIndividualResults(){
     btn.addEventListener("click", () => {
       const r = individualResults[Number(btn.dataset.idx)];
       jumpToDirectory(r.name, r.nit);
+    });
+  });
+
+  // Banco: escribir el N° de obligación por operación → reagrupa y refresca el correo en vivo
+  list.querySelectorAll('input.bo-oblig').forEach(inp => {
+    inp.addEventListener("input", () => {
+      const idx = Number(inp.dataset.idx);
+      const r = individualResults[idx];
+      if(!r || r.kind !== "bank") return;
+      if(!r.obligByOp) r.obligByOp = {};
+      r.obligByOp[inp.dataset.op] = inp.value.trim();
+      const ta = list.querySelector('textarea[data-idx="' + idx + '"]');
+      if(ta){ const d = buildBankEmailDraft(r); ta.value = "Asunto: " + d.subject + "\n\n" + d.body; }
     });
   });
 
@@ -2283,8 +2302,9 @@ async function sendOne(idx, opts){
     }
     return false;
   }
-  // Aviso si hay operaciones con Fecha de liquidación fuera de rango (permite enviar igual).
-  if(!opts.fromBulk && r.alerts && r.alerts.length){
+  const isBank = r.kind === "bank";
+  // Aviso si hay operaciones con Fecha de liquidación fuera de rango (solo inversionistas; permite enviar igual).
+  if(!isBank && !opts.fromBulk && r.alerts && r.alerts.length){
     if(!window.confirm("⚠ " + r.name + " tiene " + r.alerts.length +
       " operación(es) con Fecha de liquidación fuera de ±1 día hábil de la fecha de referencia.\n\n¿Enviar de todos modos?")) return false;
   }
@@ -2292,12 +2312,10 @@ async function sendOne(idx, opts){
 
   setInvState(idx, "Enviando…", "var(--warn)");
   try {
-    const draft = buildEmailDraft(r.name, r.count, r.total);
-    const contentBase64 = await blobToBase64(r.blob);
-    const res = await window.api.sendMail({
-      to: emails, subject: draft.subject, body: draft.body,
-      filename: r.fileName, contentBase64
-    });
+    const draft = isBank ? buildBankEmailDraft(r) : buildEmailDraft(r.name, r.count, r.total);
+    const payload = { to: emails, subject: draft.subject, body: draft.body };
+    if(!isBank){ payload.filename = r.fileName; payload.contentBase64 = await blobToBase64(r.blob); }
+    const res = await window.api.sendMail(payload);
     if(res && res.ok){
       setInvState(idx, "✓ Enviado", "var(--ok)");
       log("✓ Enviado a " + r.name + " <" + emails.join(", ") + ">", "ok");
@@ -2548,7 +2566,7 @@ initMailConfig();
 //  Siigo — comprobantes contables por inversionista (solo en la app instalada)
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante listos
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "" };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
 
@@ -2577,26 +2595,93 @@ function siigoAccFor(name, nit){ const e = SIIGO_ACCOUNTS[ invId(name, nit) ] ||
 
 function siigoCardHTML(r, idx){
   if(!SIIGO_READY) return '';
-  const acc = siigoAccFor(r.name, r.nit);
   const posted = SIIGO_POSTED[ invId(r.name, r.nit) ];
-  const debit = (acc.debit || "").trim();
+  const postedTxt = posted ? ("✓ Comp. " + escHtml(String(posted.number))) : "";
   const credit = (SIIGO_CFG.creditAccount || "").trim();
+  const stateSpan = '<span class="sg-state" data-sg="' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' + postedTxt + '</span>';
+  const registerBtn = '<button class="btn" data-act="siigo" data-idx="' + idx + '">Registrar en Siigo</button>';
+
+  if(r.kind === "bank"){
+    const bd = (SIIGO_CFG.bankDebit || "").trim();
+    const accHtml = bd
+      ? '<span class="ro-acct">Débito <b>' + escHtml(bd) + '</b> (abono a crédito) · Crédito <b>' + escHtml(credit || "—") + '</b> · 1 línea por obligación</span>'
+      : '<span class="ro-missing">Falta la cuenta débito de abonos a crédito (config. Siigo)</span>';
+    return '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' + accHtml +
+      '<span style="flex:1"></span>' + registerBtn + stateSpan + '</div>';
+  }
+
+  const acc = siigoAccFor(r.name, r.nit);
+  const debit = (acc.debit || "").trim();
   const accHtml = debit
     ? '<span class="ro-acct">Débito <b>' + escHtml(debit) + '</b> · Crédito <b>' + escHtml(credit || "—") + '</b> (fija)</span>'
     : '<span class="ro-missing">Sin cuenta débito</span>';
-  return '<div class="inv-siigo">' +
-      '<span class="siigo-tag">🧾 Siigo</span>' +
-      accHtml +
+  return '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' + accHtml +
       '<button class="linklike" data-act="cfg-siigo" data-idx="' + idx + '">⚙ ' + (debit ? 'Editar' : 'Configurar') + '</button>' +
-      '<span style="flex:1"></span>' +
-      '<button class="btn" data-act="siigo" data-idx="' + idx + '">Registrar en Siigo</button>' +
-      '<span class="sg-state" data-sg="' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' +
-        (posted ? ("✓ Comp. " + escHtml(String(posted.number))) : "") + '</span>' +
-    '</div>';
+      '<span style="flex:1"></span>' + registerBtn + stateSpan + '</div>';
 }
 function setSgState(idx, text, color){
   const el = document.querySelector('.sg-state[data-sg="' + idx + '"]');
   if(el){ el.textContent = text || ""; el.style.color = color || "var(--muted)"; }
+}
+
+// Registro de "Abono a crédito financiero" (banco): crédito total + un débito por N° de obligación.
+async function registerBank(idx, r, opts){
+  const creditAccount = (SIIGO_CFG.creditAccount || "").trim();
+  const creditNit = (SIIGO_CFG.creditNit || "").trim();
+  const bankDebit = (SIIGO_CFG.bankDebit || "").trim();
+  if(!creditAccount || !creditNit || !bankDebit){
+    showToast("Configura en Siigo: cuenta crédito fija, su tercero y la cuenta débito de abonos a crédito.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return false;
+  }
+  const groups = new Map(); // N° obligación -> monto
+  let sinOblig = 0;
+  for(const op of (r.ops || [])){
+    const num = ((r.obligByOp && r.obligByOp[op.noOp]) || "").trim();
+    if(!num){ sinOblig++; continue; }
+    groups.set(num, (groups.get(num) || 0) + op.valor);
+  }
+  if(sinOblig){ showToast("Faltan " + sinOblig + " operación(es) por N° de obligación.", false); return false; }
+  if(!groups.size){ showToast("No hay obligaciones para registrar.", false); return false; }
+  const lines = Array.from(groups, ([obligacion, value]) => ({ obligacion, value }));
+  const total = lines.reduce((s, l) => s + l.value, 0);
+  const date = ($("sgDate") && $("sgDate").value) || serialToYMD(REFERENCE_SERIAL);
+  const postedKey = invId(r.name, r.nit);
+
+  if(!opts.fromBulk && SIIGO_POSTED[postedKey]){
+    if(!window.confirm("Ya registraste " + r.name + " (comprobante " + SIIGO_POSTED[postedKey].number + ").\n\n¿Registrar OTRO comprobante?")) return false;
+  }
+  if(!opts.fromBulk){
+    const preview = "Registrar ABONO A CRÉDITO en Siigo:\n\n" +
+      "Fuente: " + r.name + "\nNIT: " + (r.nit || "—") + "\nFecha: " + date + "\nTotal: " + fmtCOP(total) + "\n\n" +
+      "Débito · cuenta " + bankDebit + " · tercero " + (r.nit || "—") + " — " + lines.length + " línea(s):\n" +
+      lines.map(l => "   · Oblig. " + l.obligacion + " — " + fmtCOP(l.value)).join("\n") + "\n" +
+      "Crédito · cuenta " + creditAccount + " · tercero " + creditNit + " — " + fmtCOP(total) +
+      "\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
+    if(!window.confirm(preview)) return false;
+  }
+  setSgState(idx, "Registrando…", "var(--warn)");
+  try {
+    const res = await window.api.siigoCreateJournal({
+      mode:"bank", date, fuenteName: r.name, fuenteNit: r.nit,
+      bankDebitAccount: bankDebit, creditAccount, creditNit,
+      documentId: SIIGO_CFG.documentId, lines,
+    });
+    if(res && res.ok){
+      SIIGO_POSTED[postedKey] = { number: res.number, id: res.id };
+      setSgState(idx, "✓ Comp. " + res.number, "var(--ok)");
+      log("✓ Siigo (abono a crédito): comprobante " + res.number + " — " + r.name + " · " + fmtCOP(total), "ok");
+      return true;
+    }
+    setSgState(idx, "✗ Error", "var(--err)");
+    log("✗ Siigo error (" + r.name + "): " + (res && res.error), "err");
+    showToast("Error registrando en Siigo: " + r.name, false);
+    return false;
+  } catch(err){
+    setSgState(idx, "✗ Error", "var(--err)");
+    log("✗ Siigo error (" + r.name + "): " + (err && err.message || err), "err");
+    return false;
+  }
 }
 
 async function registerOne(idx, opts){
@@ -2608,6 +2693,7 @@ async function registerOne(idx, opts){
     return false;
   }
   const r = individualResults[idx];
+  if(r.kind === "bank") return await registerBank(idx, r, opts);
   const acc = siigoAccFor(r.name, r.nit);
   const debit = (acc.debit || "").trim();
   const creditAccount = (SIIGO_CFG.creditAccount || "").trim();
@@ -2668,15 +2754,20 @@ async function registerAll(){
   }
   const targets = [];
   for(let i = 0; i < individualResults.length; i++){
-    const acc = siigoAccFor(individualResults[i].name, individualResults[i].nit);
-    if((acc.debit || "").trim()) targets.push(i);
+    const r = individualResults[i];
+    if(r.kind === "bank"){
+      const allOblig = (r.ops || []).length > 0 && (r.ops || []).every(op => ((r.obligByOp && r.obligByOp[op.noOp]) || "").trim());
+      if(allOblig && (SIIGO_CFG.bankDebit || "").trim()) targets.push(i);
+    } else {
+      if((siigoAccFor(r.name, r.nit).debit || "").trim()) targets.push(i);
+    }
   }
-  if(!targets.length){ showToast("Ningún inversionista tiene cuenta débito configurada (revisa el directorio).", false); return; }
+  if(!targets.length){ showToast("Nada por registrar: revisa cuentas débito (inversionistas) y N° de obligación (banco).", false); return; }
   const missing = individualResults.length - targets.length;
   const date = ($("sgDate") && $("sgDate").value) || serialToYMD(REFERENCE_SERIAL);
   const already = targets.filter(i => SIIGO_POSTED[ invId(individualResults[i].name, individualResults[i].nit) ]).length;
   let msg = "Vas a registrar " + targets.length + " comprobante(s) en Siigo con fecha " + date + ".";
-  if(missing > 0) msg += "\n" + missing + " inversionista(s) sin cuentas se omitirán.";
+  if(missing > 0) msg += "\n" + missing + " sin cuenta o sin N° de obligación se omitirán.";
   if(already > 0) msg += "\n⚠ " + already + " ya fueron registrados en esta sesión; se registrarán de nuevo.";
   msg += "\n\nEsto ESCRIBE en tu contabilidad. ¿Continuar?";
   if(!window.confirm(msg)) return;
@@ -2703,7 +2794,7 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "" };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "" };
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
     SIIGO_READY = !!(c.username && c.partnerId && c.hasAccessKey && cuentasOK);
     el("sgStatus").textContent = SIIGO_READY ? "Configurado ✓"
@@ -2718,6 +2809,7 @@ async function initSiigoConfig(){
     el("sgDocId").value = c.documentId || "";
     el("sgCreditAcct").value = c.creditAccount || "";
     el("sgCreditNit").value = c.creditNit || "";
+    el("sgBankDebit").value = c.bankDebitAccount || "";
     refreshReady(c);
   } catch(_){}
 
@@ -2729,6 +2821,7 @@ async function initSiigoConfig(){
       documentId: el("sgDocId").value.trim(),
       creditAccount: el("sgCreditAcct").value.trim(),
       creditNit: el("sgCreditNit").value.trim(),
+      bankDebitAccount: el("sgBankDebit").value.trim(),
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
     try {
