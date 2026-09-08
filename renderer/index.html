@@ -2551,7 +2551,7 @@ const vbaConst = new Set(["true","false","nothing","empty","null",
   "xlcalculationmanual","xlcalculationautomatic","xlcontinuous","xlcenter",
   "vbcrlf","vbinformation","vbnewline","vbcritical","vbyesno","vbexclamation"]);
 
-function escHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escHtml(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
 function hiLine(line){
   let out = "", i = 0, n = line.length;
   while(i < n){
