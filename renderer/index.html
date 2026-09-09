@@ -1957,7 +1957,7 @@ async function runIndividual(){
     log("• [Abono a crédito] " + fuente + ": " + ops.length + " operación(es) · " + fmtCOP(total));
   }
 
-  await renderIndividualResults();
+  await renderIndividualResults(true);
   log("✓ Proceso completado con éxito.", "ok");
   log(individualResults.length + " archivo(s) individual(es) generado(s) — descárgalos y copia el correo de cada uno abajo.", "ok");
 }
@@ -2131,11 +2131,15 @@ async function syncInvestorsToDirectory(){
   return added;
 }
 
-async function renderIndividualResults(){
+async function renderIndividualResults(syncNew){
   await loadDirectory();
   await loadSiigoAccounts();
-  const added = await syncInvestorsToDirectory();
-  if(added && typeof renderDirectory === "function") renderDirectory();
+  // Los inversionistas nuevos se agregan al directorio SOLO al procesar un archivo.
+  // Si no, al eliminar uno se volvería a agregar desde los resultados en pantalla.
+  if(syncNew){
+    const added = await syncInvestorsToDirectory();
+    if(added && typeof renderDirectory === "function") renderDirectory();
+  }
   individualResults.forEach(r => { r.alerts = (r.kind === "bank") ? [] : computeDateAlerts(r.filtered); });
   const totalAlerts = individualResults.reduce((n, r) => n + (r.alerts ? r.alerts.length : 0), 0);
   const invWithAlerts = individualResults.filter(r => r.alerts && r.alerts.length).length;
