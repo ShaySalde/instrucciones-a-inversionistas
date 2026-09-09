@@ -34,7 +34,18 @@ function getSettingsPublic() {
     fromEmail: s.fromEmail || "",
     fromName: s.fromName || "",
     hasPassword: !!(s.passwordEnc || s.passwordPlain),
+    signatureHtml: s.signatureHtml || "",
+    logoDataUrl: s.signatureLogo
+      ? ("data:" + (s.signatureLogoType || "image/png") + ";base64," + s.signatureLogo)
+      : "",
   };
+}
+
+// Texto plano -> HTML seguro (para el cuerpo del correo cuando se envía en HTML).
+function textToHtml(t) {
+  return String(t == null ? "" : t)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\r\n|\r|\n/g, "<br>");
 }
 
 function getPassword() {
@@ -48,10 +59,19 @@ function getPassword() {
   return s.passwordPlain || "";
 }
 
-function saveSettings({ fromEmail, fromName, appPassword }) {
+function saveSettings({ fromEmail, fromName, appPassword, signatureHtml, signatureLogo, signatureLogoClear }) {
   const s = loadSettingsRaw();
   s.fromEmail = (fromEmail || "").trim();
   s.fromName = (fromName || "").trim();
+  // Firma HTML (se agrega al final de cada correo).
+  if (typeof signatureHtml === "string") s.signatureHtml = signatureHtml;
+  // Logo de la firma: viene como data URL; se guarda tipo + base64. `clear` lo quita.
+  if (signatureLogoClear) {
+    delete s.signatureLogo; delete s.signatureLogoType;
+  } else if (typeof signatureLogo === "string" && signatureLogo.startsWith("data:")) {
+    const m = signatureLogo.match(/^data:([^;]+);base64,(.*)$/);
+    if (m) { s.signatureLogoType = m[1]; s.signatureLogo = m[2]; }
+  }
   // Solo actualiza la contraseña si se envió una nueva (no vacía).
   if (typeof appPassword === "string" && appPassword.trim().length) {
     const pass = appPassword.trim();
@@ -330,7 +350,31 @@ ipcMain.handle("mail:send", async (_e, { to, subject, body, filename, contentBas
     const attachments = filename && contentBase64
       ? [{ filename, content: Buffer.from(contentBase64, "base64") }]
       : [];
-    const info = await t.sendMail({ from, to, subject, text: body, attachments });
+
+    const sig = (s.signatureHtml || "").trim();
+    const mail = { from, to, subject, attachments };
+    if (sig) {
+      let sigHtml = sig;
+      if (s.signatureLogo) {
+        // Logo incrustado (inline) via Content-ID: no depende de imágenes externas.
+        const cid = "sig-logo";
+        attachments.push({
+          filename: "logo",
+          content: Buffer.from(s.signatureLogo, "base64"),
+          contentType: s.signatureLogoType || "image/png",
+          cid,
+        });
+        const img = '<img src="cid:' + cid + '" alt="logo" style="max-height:72px;border:0;display:block">';
+        sigHtml = sigHtml.includes("{{logo}}") ? sigHtml.replace(/\{\{logo\}\}/g, img) : (img + "<br>" + sigHtml);
+      }
+      mail.html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1D1D1B;line-height:1.5">'
+        + textToHtml(body) + "<br><br>" + sigHtml + "</div>";
+      const plainSig = sig.replace(/\{\{logo\}\}/g, "").replace(/<br\s*\/?>(?=\s*<br)?/gi, "\n").replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim();
+      mail.text = body + (plainSig ? "\n\n" + plainSig : "");
+    } else {
+      mail.text = body;
+    }
+    const info = await t.sendMail(mail);
     return { ok: true, messageId: info.messageId };
   } catch (err) {
     return { ok: false, error: String((err && err.message) || err) };

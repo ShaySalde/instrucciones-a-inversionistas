@@ -363,6 +363,26 @@
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
+    <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+      <label style="display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px">Firma corporativa <span style="font-weight:400">(se agrega al final de cada correo enviado)</span></label>
+      <div class="row" style="gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:2;min-width:280px">
+          <textarea id="cfgSignature" rows="6" placeholder="Escribe tu firma. Puedes usar HTML (negritas &lt;b&gt;, enlaces &lt;a&gt;, colores). Si subes un logo, usa {{logo}} donde quieras que aparezca; si no, se pone arriba." style="display:block;width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;color:var(--ink);background:#fff;resize:vertical"></textarea>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Logo (opcional · se incrusta en el correo)</div>
+          <input type="file" id="cfgLogo" accept="image/png,image/jpeg,image/gif" style="font-size:12px">
+          <div id="cfgLogoWrap" style="margin-top:8px;display:none">
+            <img id="cfgLogoPreview" alt="logo" style="max-height:56px;border:1px solid var(--line);border-radius:6px;padding:4px;background:#fff;vertical-align:middle">
+            <button class="btn" type="button" id="cfgLogoRemove" style="margin-left:8px;font-size:12px">Quitar</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Vista previa de la firma</div>
+        <div id="cfgSigPreview" style="border:1px solid var(--line);border-radius:8px;padding:12px;background:#fff;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1D1D1B;line-height:1.5;min-height:40px"></div>
+      </div>
+    </div>
     <div class="row" style="margin-top:12px">
       <button class="btn primary" id="btnSaveCfg">💾 Guardar</button>
       <button class="btn" id="btnTestCfg">🔌 Probar conexión</button>
@@ -2626,6 +2646,42 @@ async function initMailConfig(){
     else window.open(url, "_blank");
   });
 
+  // --- Firma corporativa: vista previa en vivo + logo (funciona sin Electron) ---
+  const sigEl = $("cfgSignature"), logoInput = $("cfgLogo"), logoWrap = $("cfgLogoWrap"),
+        logoPreview = $("cfgLogoPreview"), logoRemove = $("cfgLogoRemove"), sigPreview = $("cfgSigPreview");
+  let logoDataUrl = "", logoDirty = false, logoCleared = false;
+
+  function renderSigPreview(){
+    const sig = sigEl ? sigEl.value : "";
+    let html;
+    if(logoDataUrl){
+      const img = '<img src="' + logoDataUrl + '" style="max-height:72px;display:block;border:0">';
+      html = sig.includes("{{logo}}") ? sig.replace(/\{\{logo\}\}/g, img) : (img + "<br>" + sig);
+    } else {
+      html = sig.replace(/\{\{logo\}\}/g, "");
+    }
+    if(sigPreview) sigPreview.innerHTML = html.trim() || '<span style="color:#9a97a8">(sin firma)</span>';
+  }
+  function showLogo(url){
+    logoDataUrl = url || "";
+    if(logoWrap) logoWrap.style.display = logoDataUrl ? "block" : "none";
+    if(logoPreview && logoDataUrl) logoPreview.src = logoDataUrl;
+    renderSigPreview();
+  }
+  if(sigEl) sigEl.addEventListener("input", renderSigPreview);
+  if(logoInput) logoInput.addEventListener("change", () => {
+    const f = logoInput.files && logoInput.files[0];
+    if(!f) return;
+    if(f.size > 512 * 1024){ showToast("El logo debe pesar menos de 500 KB.", false); logoInput.value = ""; return; }
+    const rd = new FileReader();
+    rd.onload = () => { logoDirty = true; logoCleared = false; showLogo(rd.result); };
+    rd.readAsDataURL(f);
+  });
+  if(logoRemove) logoRemove.addEventListener("click", () => {
+    logoCleared = true; logoDirty = false; if(logoInput) logoInput.value = ""; showLogo("");
+  });
+  renderSigPreview();
+
   if(!(window.api && window.api.getSettings)){
     statusEl.textContent = "Disponible en la app instalada";
     return;
@@ -2635,6 +2691,8 @@ async function initMailConfig(){
     const s = await window.api.getSettings();
     emailEl.value = s.fromEmail || "";
     nameEl.value = s.fromName || "Área de Tesorería";
+    if(sigEl) sigEl.value = s.signatureHtml || "";
+    showLogo(s.logoDataUrl || "");
     statusEl.textContent = s.hasPassword ? "Configurado ✓" : "Falta contraseña";
     statusEl.classList.toggle("ok", !!s.hasPassword);
   } catch(_){}
@@ -2644,13 +2702,19 @@ async function initMailConfig(){
       fromEmail: (emailEl.value || "").trim(),
       fromName: (nameEl.value || "").trim(),
       appPassword: (passEl.value || "").trim(),
+      signatureHtml: sigEl ? sigEl.value : "",
     };
+    if(logoDirty) payload.signatureLogo = logoDataUrl;
+    if(logoCleared) payload.signatureLogoClear = true;
     if(!payload.fromEmail || !isValidEmail(payload.fromEmail)){
       showToast("Escribe un correo remitente válido.", false); emailEl.focus(); return;
     }
     try {
       const s = await window.api.saveSettings(payload);
       passEl.value = ""; // no dejar la contraseña en pantalla
+      logoDirty = false; logoCleared = false;
+      if(sigEl) sigEl.value = s.signatureHtml || sigEl.value;
+      showLogo(s.logoDataUrl || "");
       statusEl.textContent = s.hasPassword ? "Configurado ✓" : "Falta contraseña";
       statusEl.classList.toggle("ok", !!s.hasPassword);
       showToast("Configuración guardada");
