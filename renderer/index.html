@@ -366,8 +366,16 @@
     <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
       <label style="display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px">Firma corporativa <span style="font-weight:400">(se agrega al final de cada correo enviado)</span></label>
       <div class="row" style="gap:16px;align-items:flex-start;flex-wrap:wrap">
-        <div style="flex:2;min-width:280px">
-          <textarea id="cfgSignature" rows="6" placeholder="Escribe tu firma. Puedes usar HTML (negritas &lt;b&gt;, enlaces &lt;a&gt;, colores). Si subes un logo, usa {{logo}} donde quieras que aparezca; si no, se pone arriba." style="display:block;width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;color:var(--ink);background:#fff;resize:vertical"></textarea>
+        <div style="flex:2;min-width:300px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px">
+            <label style="grid-column:1 / -1;display:block;font-size:12px;color:var(--muted)">Nombre<input id="sfName" type="text" placeholder="Nombre y apellido" autocomplete="off" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff"></label>
+            <label style="grid-column:1 / -1;display:block;font-size:12px;color:var(--muted)">Cargo<input id="sfCargo" type="text" placeholder="p. ej. Analista de tesorería" autocomplete="off" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff"></label>
+            <label style="display:block;font-size:12px;color:var(--muted)">Teléfono<input id="sfPhone" type="text" placeholder="605 3356573" autocomplete="off" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff"></label>
+            <label style="display:block;font-size:12px;color:var(--muted)">Correo<input id="sfEmail" type="email" placeholder="correo@liquitech.co" autocomplete="off" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff"></label>
+            <label style="display:block;font-size:12px;color:var(--muted)">Sitio web<input id="sfWeb" type="text" placeholder="liquitech.co" autocomplete="off" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff"></label>
+            <label style="display:block;font-size:12px;color:var(--muted)">Dirección<input id="sfAddress" type="text" placeholder="Ciudad / dirección" autocomplete="off" style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff"></label>
+          </div>
+          <p style="color:var(--muted);font-size:11px;margin:8px 0 0">El logo, los iconos y el aviso legal se mantienen. Solo cambias estos datos.</p>
         </div>
         <div style="flex:1;min-width:200px">
           <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Logo (opcional · se incrusta en el correo)</div>
@@ -2634,6 +2642,35 @@ function downloadB64(b64, filename){
 // ============================================================================
 //  Configuración de correo (⚙) — solo activa en la app instalada (window.api)
 // ============================================================================
+// Firma corporativa: arma el HTML a partir de los campos. El logo va en {{logo}}
+// y los iconos como cid:sig-* (se incrustan al enviar / se resuelven en la vista previa).
+const SIG_DISCLAIMER = '<b>MANEJO Y PROTECCIÓN DE DATOS PERSONALES -</b> Este mensaje (incluyendo cualquier archivo adjunto) se dirige exclusivamente a su destinatario y contiene información personal confidencial y/o privilegiada que se encuentra protegida por la Ley. En consecuencia, la información aquí contenida sólo puede ser utilizada por la persona o compañía a la cual está dirigido. Si ha recibido este mensaje por error, por favor comuníquese inmediatamente con nosotros por esta misma vía, <b>DE NINGUNA MANERA REPRODUZCA O REENVÍE EL MISMO</b> y proceda <b>POR TANTO</b> a su <b>INMEDIATA eliminación</b>. Recuerde que los datos personales aquí contenidos pertenecen a cada uno de sus Titulares y/o <b>LIQUITECH SAS</b>, y que su Tratamiento sólo se encuentra legitimado si se cuenta con autorización para un Responsable determinado y con unas finalidades previamente informadas a éste, <b>SIENDO GRAVOSAS LAS SANCIONES LEGALES POR EL USO O REPRODUCCIÓN DE LA INFORMACIÓN O TEXTOS CONTENIDOS A QUE SE REFIERA.</b> En consecuencia queda prohibido su Tratamiento y cesión so pena de sanciones civiles, administrativas, e incluso penales. Finalmente, señalamos que es responsabilidad del destinatario protegerse de la existencia de posibles virus informáticos que pudiera llegar a tener el correo o cualquier anexo a él, razón por la cual <b>LIQUITECH SAS</b> no aceptará responsabilidad alguna por daños causados por cualquier virus transmitido en este correo.';
+
+function sigEsc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function buildSignatureHtml(f){
+  f = f || {};
+  const name = sigEsc(f.name), cargo = sigEsc(f.cargo), phone = sigEsc(f.phone),
+        email = sigEsc(f.email), web = sigEsc(f.web), address = sigEsc(f.address);
+  const tel = String(f.phone || "").replace(/[^0-9+]/g, "");
+  const webHref = /^https?:\/\//i.test(f.web || "") ? String(f.web) : ("https://" + String(f.web || "").replace(/^\/+/, ""));
+  const ico = (n, h) => '<img src="cid:sig-' + n + '" height="' + h + '" alt="" style="vertical-align:middle;border:0">&nbsp;&nbsp;';
+  const rows = [];
+  if((f.phone || "").trim())   rows.push('<div>' + ico("phone",13) + '<a href="tel:' + sigEsc(tel) + '" style="color:#1D1D1B;text-decoration:underline">' + phone + '</a></div>');
+  if((f.email || "").trim())   rows.push('<div>' + ico("mail",11) + '<a href="mailto:' + email + '" style="color:#1D1D1B;text-decoration:underline">' + email + '</a></div>');
+  if((f.web || "").trim())     rows.push('<div>' + ico("web",13) + '<a href="' + sigEsc(webHref) + '" style="color:#1D1D1B;text-decoration:underline">' + web + '</a></div>');
+  if((f.address || "").trim()) rows.push('<div>' + ico("pin",13) + address + '</div>');
+  return '<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;color:#1D1D1B"><tr>'
+    + '<td style="padding:0 18px 0 0;vertical-align:middle">{{logo}}</td>'
+    + '<td style="padding:0 20px 0 0;vertical-align:middle;border-right:2px solid #775CF8">'
+    + '<div style="font-size:21px;font-weight:bold;color:#111;line-height:1.15">' + name + '</div>'
+    + '<div style="font-size:15px;color:#333;margin-top:3px">' + cargo + '</div></td>'
+    + '<td style="padding:0 0 0 20px;vertical-align:middle;font-size:14px;line-height:2;color:#1D1D1B">' + rows.join("") + '</td>'
+    + '</tr></table>'
+    + '<div style="height:7px;background:#775CF8;margin:14px 0 12px"></div>'
+    + '<div style="font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#5b5b5b;line-height:1.5;text-align:justify">' + SIG_DISCLAIMER + '</div>';
+}
+
 async function initMailConfig(){
   const emailEl = $("cfgEmail"), nameEl = $("cfgName"), passEl = $("cfgPass"), statusEl = $("cfgStatus");
   if(!emailEl) return;
@@ -2646,23 +2683,23 @@ async function initMailConfig(){
     else window.open(url, "_blank");
   });
 
-  // --- Firma corporativa: vista previa en vivo + logo (funciona sin Electron) ---
-  const sigEl = $("cfgSignature"), logoInput = $("cfgLogo"), logoWrap = $("cfgLogoWrap"),
+  // --- Firma corporativa: formulario visual + vista previa en vivo + logo ---
+  const sigFields = { name:$("sfName"), cargo:$("sfCargo"), phone:$("sfPhone"), email:$("sfEmail"), web:$("sfWeb"), address:$("sfAddress") };
+  const logoInput = $("cfgLogo"), logoWrap = $("cfgLogoWrap"),
         logoPreview = $("cfgLogoPreview"), logoRemove = $("cfgLogoRemove"), sigPreview = $("cfgSigPreview");
   let logoDataUrl = "", logoDirty = false, logoCleared = false, SIG_ASSETS = {};
 
+  function readSigFields(){
+    const o = {};
+    for(const k in sigFields){ o[k] = sigFields[k] ? (sigFields[k].value || "").trim() : ""; }
+    return o;
+  }
   function renderSigPreview(){
-    const sig = sigEl ? sigEl.value : "";
-    let html;
-    if(logoDataUrl){
-      const img = '<img src="' + logoDataUrl + '" style="max-height:72px;display:block;border:0">';
-      html = sig.includes("{{logo}}") ? sig.replace(/\{\{logo\}\}/g, img) : (img + "<br>" + sig);
-    } else {
-      html = sig.replace(/\{\{logo\}\}/g, "");
-    }
-    // Iconos de contacto: resolver cid:sig-* a su imagen (data URL) para la vista previa.
+    let html = buildSignatureHtml(readSigFields());
+    const img = logoDataUrl ? '<img src="' + logoDataUrl + '" style="max-height:72px;display:block;border:0">' : "";
+    html = html.replace(/\{\{logo\}\}/g, img);
     for(const k in SIG_ASSETS){ html = html.split("cid:" + k).join(SIG_ASSETS[k]); }
-    if(sigPreview) sigPreview.innerHTML = html.trim() || '<span style="color:#9a97a8">(sin firma)</span>';
+    if(sigPreview) sigPreview.innerHTML = html;
   }
   function showLogo(url){
     logoDataUrl = url || "";
@@ -2670,7 +2707,7 @@ async function initMailConfig(){
     if(logoPreview && logoDataUrl) logoPreview.src = logoDataUrl;
     renderSigPreview();
   }
-  if(sigEl) sigEl.addEventListener("input", renderSigPreview);
+  for(const k in sigFields){ if(sigFields[k]) sigFields[k].addEventListener("input", renderSigPreview); }
   if(logoInput) logoInput.addEventListener("change", () => {
     const f = logoInput.files && logoInput.files[0];
     if(!f) return;
@@ -2693,7 +2730,8 @@ async function initMailConfig(){
     const s = await window.api.getSettings();
     emailEl.value = s.fromEmail || "";
     nameEl.value = s.fromName || "Área de Tesorería";
-    if(sigEl) sigEl.value = s.signatureHtml || "";
+    const sf = s.signatureFields || {};
+    for(const k in sigFields){ if(sigFields[k]) sigFields[k].value = sf[k] || ""; }
     SIG_ASSETS = s.sigAssets || {};
     showLogo(s.logoDataUrl || "");
     statusEl.textContent = s.hasPassword ? "Configurado ✓" : "Falta contraseña";
@@ -2705,7 +2743,8 @@ async function initMailConfig(){
       fromEmail: (emailEl.value || "").trim(),
       fromName: (nameEl.value || "").trim(),
       appPassword: (passEl.value || "").trim(),
-      signatureHtml: sigEl ? sigEl.value : "",
+      signatureFields: readSigFields(),
+      signatureHtml: buildSignatureHtml(readSigFields()),
     };
     if(logoDirty) payload.signatureLogo = logoDataUrl;
     if(logoCleared) payload.signatureLogoClear = true;
@@ -2716,7 +2755,8 @@ async function initMailConfig(){
       const s = await window.api.saveSettings(payload);
       passEl.value = ""; // no dejar la contraseña en pantalla
       logoDirty = false; logoCleared = false;
-      if(sigEl) sigEl.value = s.signatureHtml || sigEl.value;
+      const sf2 = s.signatureFields || readSigFields();
+      for(const k in sigFields){ if(sigFields[k]) sigFields[k].value = sf2[k] || ""; }
       showLogo(s.logoDataUrl || "");
       statusEl.textContent = s.hasPassword ? "Configurado ✓" : "Falta contraseña";
       statusEl.classList.toggle("ok", !!s.hasPassword);

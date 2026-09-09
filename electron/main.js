@@ -55,6 +55,7 @@ function getSettingsPublic() {
       ? ("data:" + (s.signatureLogoType || "image/png") + ";base64," + s.signatureLogo)
       : "",
     sigAssets: sigAssetDataUrls(),
+    signatureFields: s.signatureFields || null,
   };
 }
 
@@ -76,11 +77,12 @@ function getPassword() {
   return s.passwordPlain || "";
 }
 
-function saveSettings({ fromEmail, fromName, appPassword, signatureHtml, signatureLogo, signatureLogoClear }) {
+function saveSettings({ fromEmail, fromName, appPassword, signatureHtml, signatureFields, signatureLogo, signatureLogoClear }) {
   const s = loadSettingsRaw();
   s.fromEmail = (fromEmail || "").trim();
   s.fromName = (fromName || "").trim();
-  // Firma HTML (se agrega al final de cada correo).
+  // Firma: se guardan los campos (para el formulario) y el HTML ya armado (para enviar).
+  if (signatureFields && typeof signatureFields === "object") s.signatureFields = signatureFields;
   if (typeof signatureHtml === "string") s.signatureHtml = signatureHtml;
   // Logo de la firma: viene como data URL; se guarda tipo + base64. `clear` lo quita.
   if (signatureLogoClear) {
@@ -105,8 +107,19 @@ function saveSettings({ fromEmail, fromName, appPassword, signatureHtml, signatu
   return getSettingsPublic();
 }
 
+// Datos editables de la firma (el usuario los cambia con un formulario visual).
+const DEFAULT_SIGNATURE_FIELDS = {
+  name: "Shayna Hernandez Ortega",
+  cargo: "Analista de tesoreria",
+  phone: "605 3356573",
+  email: "shernandez@liquitech.co",
+  web: "liquitech.co",
+  address: "Bc Empresarial, Cra. 24 #1A - 24 Oficina 1201, Puerto Colombia",
+};
+
 // Firma corporativa de fábrica (Liquitech). El logo se lee de electron/firma-logo.png
-// y se incrusta inline al enviar. {{logo}} marca dónde va el logo.
+// y se incrusta inline al enviar. {{logo}} marca dónde va el logo. El HTML lo arma
+// el renderer a partir de los campos; esto es el valor inicial de fábrica.
 const DEFAULT_SIGNATURE_HTML =
 `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;color:#1D1D1B"><tr>
 <td style="padding:0 18px 0 0;vertical-align:middle">{{logo}}</td>
@@ -126,13 +139,22 @@ const DEFAULT_SIGNATURE_HTML =
 // Deja la firma de fábrica SOLO si el usuario aún no tiene firma (no la pisa).
 function seedSettingsOnce() {
   const s = loadSettingsRaw();
+  let changed = false;
   if (s.signatureHtml === undefined && !s.signatureLogo) {
     s.signatureHtml = DEFAULT_SIGNATURE_HTML;
-    try {
-      const logo = fs.readFileSync(path.join(__dirname, "firma-logo.png"));
-      s.signatureLogo = logo.toString("base64");
-      s.signatureLogoType = "image/png";
-    } catch (_) { /* sin logo si falta el archivo */ }
+    changed = true;
+  }
+  if (s.signatureFields === undefined) {
+    s.signatureFields = DEFAULT_SIGNATURE_FIELDS;
+    changed = true;
+  }
+  if (changed) {
+    if (!s.signatureLogo) {
+      try {
+        s.signatureLogo = fs.readFileSync(path.join(__dirname, "firma-logo.png")).toString("base64");
+        s.signatureLogoType = "image/png";
+      } catch (_) { /* sin logo si falta el archivo */ }
+    }
     writeJson(settingsPath(), s);
   }
 }
