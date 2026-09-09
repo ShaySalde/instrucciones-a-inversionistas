@@ -1675,9 +1675,11 @@ function buildResumenSheet(dat, targets, fecha){
       else invGroups.set(nm, (invGroups.get(nm) || 0) + t);
     }
   }
+  // Total Inversionistas = inversionistas + fuentes de fondeo (Banco de Occidente).
+  // Los reintegros de no negociadas NO entran (van aparte, debajo del Margen).
   let totalInversionistas = 0;
   for(const v of invGroups.values()) totalInversionistas += v;
-  for(const v of reintegroItems) totalInversionistas += v;
+  for(const v of fuenteGroups.values()) totalInversionistas += v;
   const liquitech = totalRecibido - totalInversionistas;
   const margen = liquitech - capitalLiquitech - saldosAFavor;
 
@@ -1691,7 +1693,6 @@ function buildResumenSheet(dat, targets, fecha){
   aoa.push(["Inversionista / Fuente de Fondeo", "Total a inversionista"]);
   const firstData = aoa.length;
   for(const [n, v] of invSorted) aoa.push([n, v]);
-  for(const v of reintegroItems) aoa.push(["Reintegros de no negociadas", v]);
   for(const [n, v] of fuenteSorted) aoa.push([n + "  (fuente de fondeo)", v]);
   const lastData = aoa.length - 1;
   aoa.push(["Total Inversionistas", totalInversionistas]); const rTotalInv = aoa.length - 1;
@@ -1700,10 +1701,17 @@ function buildResumenSheet(dat, targets, fecha){
   aoa.push(["Capital Liquitech (inversión sin fuente de fondeo)", capitalLiquitech]); const rCap = aoa.length - 1;
   aoa.push(["Saldos a favor (positivos)", saldosAFavor]);  const rSal = aoa.length - 1;
   aoa.push(["Margen", margen]);                            const rMar = aoa.length - 1;
+  // Reintegros de no negociadas: aparte, debajo del Margen (ítem por ítem; no entran en los totales).
+  const reintRows = [];
+  if(reintegroItems.length){
+    aoa.push(["", ""]);
+    for(const v of reintegroItems){ aoa.push(["Reintegros de no negociadas", v]); reintRows.push(aoa.length - 1); }
+  }
+  const lastRow = aoa.length - 1;
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const CUR = '"$ "#,##0.00;[Red]-"$ "#,##0.00';
-  for(let r = firstData; r <= rMar; r++){
+  for(let r = firstData; r <= lastRow; r++){
     const a = XLSX.utils.encode_cell({ r, c: 1 });
     if(ws[a] && typeof ws[a].v === "number"){ ws[a].t = "n"; ws[a].z = CUR; }
   }
@@ -1738,6 +1746,11 @@ function buildResumenSheet(dat, targets, fecha){
   at(rMar, 0).s = { font:{ name:XL_FONT, sz:12, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
   at(rMar, 1).s = { font:{ name:XL_FONT, sz:12, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"right", vertical:"center" } };
   ws["!rows"][rMar] = { hpt:24 };
+  for(const r of reintRows){
+    const bd = { bottom:{ style:"thin", color:{ rgb:XLC.border } } };
+    at(r, 0).s = { font:{ name:XL_FONT_DATA, sz:10, italic:true, color:{ rgb:XLC.muted } }, alignment:{ horizontal:"left", vertical:"center" }, border:bd };
+    at(r, 1).s = { font:{ name:XL_FONT_DATA, sz:10, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"right", vertical:"center" }, border:bd };
+  }
   return ws;
 }
 
