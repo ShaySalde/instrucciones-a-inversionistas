@@ -1642,6 +1642,99 @@ function parsePaymentTape(wb){
   return { src, dat };
 }
 
+// Arma la hoja "Resumen de instrucción" (tabla de instrucciones como el correo + totales).
+// Liquitech se identifica por NIT (901228343); si falta la columna NIT, por nombre.
+const RESUMEN_LIQUITECH_NIT = "901228343";
+function buildResumenSheet(dat, targets, fecha){
+  const idx = n => targets.indexOf(n);
+  const iInvName = idx("Nombre Inversionista"), iFuente = idx("Nombre fuente de fondeo"),
+        iNitInv = idx("NIT inversionista"), iTot = idx("Total para inversionista"),
+        iVP = idx("Valor a pagar"), iRec = idx("Valor recibido"),
+        iSal = idx("Saldo a favor/ contra"), iVInv = idx("Valor Invertido");
+  const nitKey = v => String(v == null ? "" : v).split("-")[0].replace(/\D/g, "");
+  const isLiq = r => (iNitInv >= 0 && nitKey(r[iNitInv]))
+    ? (nitKey(r[iNitInv]) === RESUMEN_LIQUITECH_NIT)
+    : /liquitech/i.test(String(r[iInvName] ?? ""));
+
+  const invGroups = new Map(), fuenteGroups = new Map();
+  let totalRecibido = 0, saldosAFavor = 0, capitalLiquitech = 0;
+  for(const r of dat){
+    const fuente = String((iFuente >= 0 ? r[iFuente] : "") ?? "").trim();
+    const liq = isLiq(r);
+    totalRecibido += iRec >= 0 ? val0(r[iRec]) : 0;
+    const sal = iSal >= 0 ? val0(r[iSal]) : 0; if(sal > 0) saldosAFavor += sal;
+    if(fuente !== ""){
+      fuenteGroups.set(fuente, (fuenteGroups.get(fuente) || 0) + (iVP >= 0 ? val0(r[iVP]) : 0));
+    } else if(liq){
+      capitalLiquitech += iVInv >= 0 ? val0(r[iVInv]) : 0;
+    } else {
+      const nm = String((iInvName >= 0 ? r[iInvName] : "") ?? "").trim() || "(sin inversionista)";
+      invGroups.set(nm, (invGroups.get(nm) || 0) + (iTot >= 0 ? val0(r[iTot]) : 0));
+    }
+  }
+  let totalInversionistas = 0; for(const v of invGroups.values()) totalInversionistas += v;
+  const liquitech = totalRecibido - totalInversionistas;
+  const margen = liquitech - capitalLiquitech - saldosAFavor;
+
+  const cmp = (a, b) => a.localeCompare(b, "es", { sensitivity: "base" });
+  const invSorted = [...invGroups.entries()].sort((a, b) => cmp(a[0], b[0]));
+  const fuenteSorted = [...fuenteGroups.entries()].sort((a, b) => cmp(a[0], b[0]));
+
+  const aoa = [];
+  aoa.push(["Resumen de instrucción", ""]);
+  aoa.push(["Payment tape distribuido   ·   Generado " + fecha, ""]);
+  aoa.push(["Inversionista / Fuente de Fondeo", "Total a inversionista"]);
+  const firstData = aoa.length;
+  for(const [n, v] of invSorted) aoa.push([n, v]);
+  for(const [n, v] of fuenteSorted) aoa.push([n + "  (fuente de fondeo)", v]);
+  const lastData = aoa.length - 1;
+  aoa.push(["Total Inversionistas", totalInversionistas]); const rTotalInv = aoa.length - 1;
+  aoa.push(["Liquitech", liquitech]);                      const rLiq = aoa.length - 1;
+  aoa.push(["", ""]);
+  aoa.push(["Capital Liquitech (inversión sin fuente de fondeo)", capitalLiquitech]); const rCap = aoa.length - 1;
+  aoa.push(["Saldos a favor (positivos)", saldosAFavor]);  const rSal = aoa.length - 1;
+  aoa.push(["Margen", margen]);                            const rMar = aoa.length - 1;
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const CUR = '"$ "#,##0.00;[Red]-"$ "#,##0.00';
+  for(let r = firstData; r <= rMar; r++){
+    const a = XLSX.utils.encode_cell({ r, c: 1 });
+    if(ws[a] && typeof ws[a].v === "number"){ ws[a].t = "n"; ws[a].z = CUR; }
+  }
+  ws["!cols"] = [{ wch: 52 }, { wch: 22 }];
+  ws["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:1} }, { s:{r:1,c:0}, e:{r:1,c:1} }];
+  ws["!rows"] = []; ws["!rows"][0] = { hpt:30 }; ws["!rows"][1] = { hpt:20 }; ws["!rows"][2] = { hpt:24 };
+
+  const solid = rgb => ({ patternType:"solid", fgColor:{ rgb } });
+  const at = (r, c) => { const a = XLSX.utils.encode_cell({ r, c }); if(!ws[a]) ws[a] = { t:"s", v:"" }; return ws[a]; };
+  for(let c = 0; c <= 1; c++) at(0, c).s = { font:{ name:XL_FONT, sz:14, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.titleFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
+  for(let c = 0; c <= 1; c++) at(1, c).s = { font:{ name:XL_FONT, sz:10, italic:true, color:{ rgb:XLC.muted } }, fill:solid(XLC.subFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
+  at(2, 0).s = { font:{ name:XL_FONT, sz:10.5, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"left", vertical:"center" }, border:{ bottom:{ style:"medium", color:{ rgb:XLC.accentBlue } } } };
+  at(2, 1).s = { font:{ name:XL_FONT, sz:10.5, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"right", vertical:"center" }, border:{ bottom:{ style:"medium", color:{ rgb:XLC.accentBlue } } } };
+  for(let r = firstData; r <= lastData; r++){
+    const zebra = ((r - firstData) % 2) === 1;
+    const bd = { bottom:{ style:"thin", color:{ rgb:XLC.border } } };
+    const a = { font:{ name:XL_FONT_DATA, sz:10, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"left", vertical:"center" }, border:bd };
+    const b = { font:{ name:XL_FONT_DATA, sz:10, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"right", vertical:"center" }, border:bd };
+    if(zebra){ a.fill = solid(XLC.zebra); b.fill = solid(XLC.zebra); }
+    at(r, 0).s = a; at(r, 1).s = b;
+  }
+  for(const r of [rTotalInv, rLiq]){
+    const top = { top:{ style:r === rTotalInv ? "medium" : "thin", color:{ rgb:XLC.headFill } } };
+    at(r, 0).s = { font:{ name:XL_FONT, sz:11, bold:true, color:{ rgb:XLC.ink } }, fill:solid(XLC.totalFill), alignment:{ horizontal:"left", vertical:"center" }, border:top };
+    at(r, 1).s = { font:{ name:XL_FONT, sz:11, bold:true, color:{ rgb:XLC.ink } }, fill:solid(XLC.totalFill), alignment:{ horizontal:"right", vertical:"center" }, border:top };
+  }
+  for(const r of [rCap, rSal]){
+    const bd = { bottom:{ style:"thin", color:{ rgb:XLC.border } } };
+    at(r, 0).s = { font:{ name:XL_FONT_DATA, sz:10, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"left", vertical:"center" }, border:bd };
+    at(r, 1).s = { font:{ name:XL_FONT_DATA, sz:10, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"right", vertical:"center" }, border:bd };
+  }
+  at(rMar, 0).s = { font:{ name:XL_FONT, sz:12, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
+  at(rMar, 1).s = { font:{ name:XL_FONT, sz:12, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"right", vertical:"center" } };
+  ws["!rows"][rMar] = { hpt:24 };
+  return ws;
+}
+
 async function runDistribuir(){
   log("▶ Leyendo el libro…", "step");
   const wb = await readWorkbookFromFile(currentFile);
@@ -1674,8 +1767,12 @@ async function runDistribuir(){
   });
   insertSheet(wb, wsBase, "Base Distribuida", src.name);
 
-  // El entregable solo conserva la hoja original + "Base Distribuida".
-  // Las hojas Tabla Inversionistas, Instruccion y Det_<inversionista> ya no se generan.
+  // ---- 2) Resumen de instrucción ----
+  log("▶ Generando \"Resumen de instrucción\"…", "step");
+  const wsResumen = buildResumenSheet(dat, DIST_TARGETS, fechaB);
+  insertSheet(wb, wsResumen, "Resumen de instrucción", src.name);
+
+  // El entregable conserva la hoja original + "Base Distribuida" + "Resumen de instrucción".
 
   // Salida
   log("▶ Generando archivo de salida…", "step");
