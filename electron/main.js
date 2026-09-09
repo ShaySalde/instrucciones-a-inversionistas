@@ -88,6 +88,38 @@ function saveSettings({ fromEmail, fromName, appPassword, signatureHtml, signatu
   return getSettingsPublic();
 }
 
+// Firma corporativa de fábrica (Liquitech). El logo se lee de electron/firma-logo.png
+// y se incrusta inline al enviar. {{logo}} marca dónde va el logo.
+const DEFAULT_SIGNATURE_HTML =
+`<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;color:#1D1D1B"><tr>
+<td style="padding:0 18px 0 0;vertical-align:middle">{{logo}}</td>
+<td style="padding:0 20px 0 0;vertical-align:middle;border-right:2px solid #775CF8">
+<div style="font-size:21px;font-weight:bold;color:#111;line-height:1.15">Shayna Hernandez Ortega</div>
+<div style="font-size:15px;color:#333;margin-top:3px">Analista de tesoreria</div>
+</td>
+<td style="padding:0 0 0 20px;vertical-align:middle;font-size:14px;line-height:1.95;color:#1D1D1B">
+<div>📞&nbsp; <a href="tel:6053356573" style="color:#1D1D1B;text-decoration:underline">605 3356573</a></div>
+<div>✉️&nbsp; <a href="mailto:shernandez@liquitech.co" style="color:#1D1D1B;text-decoration:underline">shernandez@liquitech.co</a></div>
+<div>🌐&nbsp; <a href="https://liquitech.co" style="color:#1D1D1B;text-decoration:underline">liquitech.co</a></div>
+<div>📍&nbsp; Bc Empresarial, Cra. 24 #1A - 24 Oficina 1201, Puerto Colombia</div>
+</td></tr></table>
+<div style="height:7px;background:#775CF8;margin:14px 0 12px"></div>
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#5b5b5b;line-height:1.5;text-align:justify"><b>MANEJO Y PROTECCIÓN DE DATOS PERSONALES -</b> Este mensaje (incluyendo cualquier archivo adjunto) se dirige exclusivamente a su destinatario y contiene información personal confidencial y/o privilegiada que se encuentra protegida por la Ley. En consecuencia, la información aquí contenida sólo puede ser utilizada por la persona o compañía a la cual está dirigido. Si ha recibido este mensaje por error, por favor comuníquese inmediatamente con nosotros por esta misma vía, <b>DE NINGUNA MANERA REPRODUZCA O REENVÍE EL MISMO</b> y proceda <b>POR TANTO</b> a su <b>INMEDIATA eliminación</b>. Recuerde que los datos personales aquí contenidos pertenecen a cada uno de sus Titulares y/o <b>LIQUITECH SAS</b>, y que su Tratamiento sólo se encuentra legitimado si se cuenta con autorización para un Responsable determinado y con unas finalidades previamente informadas a éste, <b>SIENDO GRAVOSAS LAS SANCIONES LEGALES POR EL USO O REPRODUCCIÓN DE LA INFORMACIÓN O TEXTOS CONTENIDOS A QUE SE REFIERA.</b> En consecuencia queda prohibido su Tratamiento y cesión so pena de sanciones civiles, administrativas, e incluso penales. Finalmente, señalamos que es responsabilidad del destinatario protegerse de la existencia de posibles virus informáticos que pudiera llegar a tener el correo o cualquier anexo a él, razón por la cual <b>LIQUITECH SAS</b> no aceptará responsabilidad alguna por daños causados por cualquier virus transmitido en este correo.</div>`;
+
+// Deja la firma de fábrica SOLO si el usuario aún no tiene firma (no la pisa).
+function seedSettingsOnce() {
+  const s = loadSettingsRaw();
+  if (s.signatureHtml === undefined && !s.signatureLogo) {
+    s.signatureHtml = DEFAULT_SIGNATURE_HTML;
+    try {
+      const logo = fs.readFileSync(path.join(__dirname, "firma-logo.png"));
+      s.signatureLogo = logo.toString("base64");
+      s.signatureLogoType = "image/png";
+    } catch (_) { /* sin logo si falta el archivo */ }
+    writeJson(settingsPath(), s);
+  }
+}
+
 function makeTransport() {
   const s = loadSettingsRaw();
   const pass = getPassword();
@@ -510,6 +542,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   try { seedDirectoryOnce(); } catch (_) {}
+  try { seedSettingsOnce(); } catch (_) {}
   try { migrateStoresOnce(); } catch (_) {}
   createWindow();
 });
