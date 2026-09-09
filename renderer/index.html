@@ -1656,7 +1656,7 @@ function buildResumenSheet(dat, targets, fecha){
     ? (nitKey(r[iNitInv]) === RESUMEN_LIQUITECH_NIT)
     : /liquitech/i.test(String(r[iInvName] ?? ""));
 
-  const invGroups = new Map(), fuenteGroups = new Map();
+  const invGroups = new Map(), fuenteGroups = new Map(), reintegroItems = [];
   let totalRecibido = 0, saldosAFavor = 0, capitalLiquitech = 0;
   for(const r of dat){
     const fuente = String((iFuente >= 0 ? r[iFuente] : "") ?? "").trim();
@@ -1668,11 +1668,16 @@ function buildResumenSheet(dat, targets, fecha){
     } else if(liq){
       capitalLiquitech += iVInv >= 0 ? val0(r[iVInv]) : 0;
     } else {
-      const nm = String((iInvName >= 0 ? r[iInvName] : "") ?? "").trim() || "(sin inversionista)";
-      invGroups.set(nm, (invGroups.get(nm) || 0) + (iTot >= 0 ? val0(r[iTot]) : 0));
+      const nm = String((iInvName >= 0 ? r[iInvName] : "") ?? "").trim();
+      const t = iTot >= 0 ? val0(r[iTot]) : 0;
+      // Sin nombre = reintegro de no negociada: cada uno como ítem propio (no se suman en una línea).
+      if(nm === "") reintegroItems.push(t);
+      else invGroups.set(nm, (invGroups.get(nm) || 0) + t);
     }
   }
-  let totalInversionistas = 0; for(const v of invGroups.values()) totalInversionistas += v;
+  let totalInversionistas = 0;
+  for(const v of invGroups.values()) totalInversionistas += v;
+  for(const v of reintegroItems) totalInversionistas += v;
   const liquitech = totalRecibido - totalInversionistas;
   const margen = liquitech - capitalLiquitech - saldosAFavor;
 
@@ -1686,6 +1691,7 @@ function buildResumenSheet(dat, targets, fecha){
   aoa.push(["Inversionista / Fuente de Fondeo", "Total a inversionista"]);
   const firstData = aoa.length;
   for(const [n, v] of invSorted) aoa.push([n, v]);
+  for(const v of reintegroItems) aoa.push(["Reintegros de no negociadas", v]);
   for(const [n, v] of fuenteSorted) aoa.push([n + "  (fuente de fondeo)", v]);
   const lastData = aoa.length - 1;
   aoa.push(["Total Inversionistas", totalInversionistas]); const rTotalInv = aoa.length - 1;
