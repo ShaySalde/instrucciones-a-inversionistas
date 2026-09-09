@@ -2649,7 +2649,7 @@ async function initMailConfig(){
   // --- Firma corporativa: vista previa en vivo + logo (funciona sin Electron) ---
   const sigEl = $("cfgSignature"), logoInput = $("cfgLogo"), logoWrap = $("cfgLogoWrap"),
         logoPreview = $("cfgLogoPreview"), logoRemove = $("cfgLogoRemove"), sigPreview = $("cfgSigPreview");
-  let logoDataUrl = "", logoDirty = false, logoCleared = false;
+  let logoDataUrl = "", logoDirty = false, logoCleared = false, SIG_ASSETS = {};
 
   function renderSigPreview(){
     const sig = sigEl ? sigEl.value : "";
@@ -2660,6 +2660,8 @@ async function initMailConfig(){
     } else {
       html = sig.replace(/\{\{logo\}\}/g, "");
     }
+    // Iconos de contacto: resolver cid:sig-* a su imagen (data URL) para la vista previa.
+    for(const k in SIG_ASSETS){ html = html.split("cid:" + k).join(SIG_ASSETS[k]); }
     if(sigPreview) sigPreview.innerHTML = html.trim() || '<span style="color:#9a97a8">(sin firma)</span>';
   }
   function showLogo(url){
@@ -2692,6 +2694,7 @@ async function initMailConfig(){
     emailEl.value = s.fromEmail || "";
     nameEl.value = s.fromName || "Área de Tesorería";
     if(sigEl) sigEl.value = s.signatureHtml || "";
+    SIG_ASSETS = s.sigAssets || {};
     showLogo(s.logoDataUrl || "");
     statusEl.textContent = s.hasPassword ? "Configurado ✓" : "Falta contraseña";
     statusEl.classList.toggle("ok", !!s.hasPassword);

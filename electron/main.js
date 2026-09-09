@@ -28,6 +28,22 @@ function writeJson(p, obj) {
 // settings.json: { fromEmail, fromName, passwordEnc (base64), passwordPlain? }
 function loadSettingsRaw() { return readJson(settingsPath(), {}); }
 
+// Iconos de la firma (teléfono, correo, web, ubicación) empaquetados en
+// electron/sig-assets. Se incrustan inline (CID) al enviar; la vista previa
+// los recibe como data URL vía getSettingsPublic().
+const SIG_ASSET_DIR = path.join(__dirname, "sig-assets");
+const SIG_ICON_NAMES = ["phone", "mail", "web", "pin"];
+function sigAssetDataUrls() {
+  const out = {};
+  for (const n of SIG_ICON_NAMES) {
+    try {
+      out["sig-" + n] = "data:image/png;base64," +
+        fs.readFileSync(path.join(SIG_ASSET_DIR, n + ".png")).toString("base64");
+    } catch (_) { /* icono ausente */ }
+  }
+  return out;
+}
+
 function getSettingsPublic() {
   const s = loadSettingsRaw();
   return {
@@ -38,6 +54,7 @@ function getSettingsPublic() {
     logoDataUrl: s.signatureLogo
       ? ("data:" + (s.signatureLogoType || "image/png") + ";base64," + s.signatureLogo)
       : "",
+    sigAssets: sigAssetDataUrls(),
   };
 }
 
@@ -97,11 +114,11 @@ const DEFAULT_SIGNATURE_HTML =
 <div style="font-size:21px;font-weight:bold;color:#111;line-height:1.15">Shayna Hernandez Ortega</div>
 <div style="font-size:15px;color:#333;margin-top:3px">Analista de tesoreria</div>
 </td>
-<td style="padding:0 0 0 20px;vertical-align:middle;font-size:14px;line-height:1.95;color:#1D1D1B">
-<div>📞&nbsp; <a href="tel:6053356573" style="color:#1D1D1B;text-decoration:underline">605 3356573</a></div>
-<div>✉️&nbsp; <a href="mailto:shernandez@liquitech.co" style="color:#1D1D1B;text-decoration:underline">shernandez@liquitech.co</a></div>
-<div>🌐&nbsp; <a href="https://liquitech.co" style="color:#1D1D1B;text-decoration:underline">liquitech.co</a></div>
-<div>📍&nbsp; Bc Empresarial, Cra. 24 #1A - 24 Oficina 1201, Puerto Colombia</div>
+<td style="padding:0 0 0 20px;vertical-align:middle;font-size:14px;line-height:2;color:#1D1D1B">
+<div><img src="cid:sig-phone" height="13" alt="" style="vertical-align:middle;border:0">&nbsp;&nbsp;<a href="tel:6053356573" style="color:#1D1D1B;text-decoration:underline">605 3356573</a></div>
+<div><img src="cid:sig-mail" height="11" alt="" style="vertical-align:middle;border:0">&nbsp;&nbsp;<a href="mailto:shernandez@liquitech.co" style="color:#1D1D1B;text-decoration:underline">shernandez@liquitech.co</a></div>
+<div><img src="cid:sig-web" height="13" alt="" style="vertical-align:middle;border:0">&nbsp;&nbsp;<a href="https://liquitech.co" style="color:#1D1D1B;text-decoration:underline">liquitech.co</a></div>
+<div><img src="cid:sig-pin" height="13" alt="" style="vertical-align:middle;border:0">&nbsp;&nbsp;Bc Empresarial, Cra. 24 #1A - 24 Oficina 1201, Puerto Colombia</div>
 </td></tr></table>
 <div style="height:7px;background:#775CF8;margin:14px 0 12px"></div>
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#5b5b5b;line-height:1.5;text-align:justify"><b>MANEJO Y PROTECCIÓN DE DATOS PERSONALES -</b> Este mensaje (incluyendo cualquier archivo adjunto) se dirige exclusivamente a su destinatario y contiene información personal confidencial y/o privilegiada que se encuentra protegida por la Ley. En consecuencia, la información aquí contenida sólo puede ser utilizada por la persona o compañía a la cual está dirigido. Si ha recibido este mensaje por error, por favor comuníquese inmediatamente con nosotros por esta misma vía, <b>DE NINGUNA MANERA REPRODUZCA O REENVÍE EL MISMO</b> y proceda <b>POR TANTO</b> a su <b>INMEDIATA eliminación</b>. Recuerde que los datos personales aquí contenidos pertenecen a cada uno de sus Titulares y/o <b>LIQUITECH SAS</b>, y que su Tratamiento sólo se encuentra legitimado si se cuenta con autorización para un Responsable determinado y con unas finalidades previamente informadas a éste, <b>SIENDO GRAVOSAS LAS SANCIONES LEGALES POR EL USO O REPRODUCCIÓN DE LA INFORMACIÓN O TEXTOS CONTENIDOS A QUE SE REFIERA.</b> En consecuencia queda prohibido su Tratamiento y cesión so pena de sanciones civiles, administrativas, e incluso penales. Finalmente, señalamos que es responsabilidad del destinatario protegerse de la existencia de posibles virus informáticos que pudiera llegar a tener el correo o cualquier anexo a él, razón por la cual <b>LIQUITECH SAS</b> no aceptará responsabilidad alguna por daños causados por cualquier virus transmitido en este correo.</div>`;
@@ -398,6 +415,20 @@ ipcMain.handle("mail:send", async (_e, { to, subject, body, filename, contentBas
         });
         const img = '<img src="cid:' + cid + '" alt="logo" style="max-height:72px;border:0;display:block">';
         sigHtml = sigHtml.includes("{{logo}}") ? sigHtml.replace(/\{\{logo\}\}/g, img) : (img + "<br>" + sigHtml);
+      }
+      // Iconos de contacto incrustados (inline) si la firma los referencia.
+      for (const n of SIG_ICON_NAMES) {
+        const cid = "sig-" + n;
+        if (sigHtml.includes("cid:" + cid)) {
+          try {
+            attachments.push({
+              filename: n + ".png",
+              content: fs.readFileSync(path.join(SIG_ASSET_DIR, n + ".png")),
+              contentType: "image/png",
+              cid,
+            });
+          } catch (_) { /* icono ausente */ }
+        }
       }
       mail.html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1D1D1B;line-height:1.5">'
         + textToHtml(body) + "<br><br>" + sigHtml + "</div>";
