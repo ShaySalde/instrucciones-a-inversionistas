@@ -1649,7 +1649,7 @@ function buildResumenSheet(dat, targets, fecha){
   const idx = n => targets.indexOf(n);
   const iInvName = idx("Nombre Inversionista"), iFuente = idx("Nombre fuente de fondeo"),
         iNitInv = idx("NIT inversionista"), iTot = idx("Total para inversionista"),
-        iVP = idx("Valor a pagar"), iRec = idx("Valor recibido"),
+        iRec = idx("Valor recibido"),
         iSal = idx("Saldo a favor/ contra"), iVInv = idx("Valor Invertido");
   const nitKey = v => String(v == null ? "" : v).split("-")[0].replace(/\D/g, "");
   const isLiq = r => (iNitInv >= 0 && nitKey(r[iNitInv]))
@@ -1664,7 +1664,8 @@ function buildResumenSheet(dat, targets, fecha){
     totalRecibido += iRec >= 0 ? val0(r[iRec]) : 0;
     const sal = iSal >= 0 ? val0(r[iSal]) : 0; if(sal > 0) saldosAFavor += sal;
     if(fuente !== ""){
-      fuenteGroups.set(fuente, (fuenteGroups.get(fuente) || 0) + (iVP >= 0 ? val0(r[iVP]) : 0));
+      // Fuente de fondeo (Banco de Occidente) usa la MISMA columna que los inversionistas: Total para inversionista.
+      fuenteGroups.set(fuente, (fuenteGroups.get(fuente) || 0) + (iTot >= 0 ? val0(r[iTot]) : 0));
     } else if(liq){
       capitalLiquitech += iVInv >= 0 ? val0(r[iVInv]) : 0;
     } else {
