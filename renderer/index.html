@@ -445,10 +445,18 @@
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Traslado entre cuentas</b> — cuenta origen (banco Liquitech) desde donde salen los giros:</p>
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Traslado entre cuentas (distribution amount)</b> — cuentas fijas. Cada beneficiario se debita a su cuenta destino (según sea línea de Inversionistas o Liquitech) y se acredita a la cuenta origen:</p>
     <div class="row" style="gap:16px;align-items:flex-start">
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta origen del traslado (fija)
+      <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta origen del traslado (fija)
         <input type="text" id="sgTransferOrigin" inputmode="numeric" placeholder="p. ej. 11100501" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+      <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta destino · Inversionistas (fondeadores)
+        <input type="text" id="sgTransferDestInv" inputmode="numeric" placeholder="p. ej. 11100510" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+      <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta destino · Liquitech (FIC)
+        <input type="text" id="sgTransferDestLiq" inputmode="numeric" placeholder="p. ej. 11100511" autocomplete="off"
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
@@ -1764,7 +1772,9 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
   if(hasConcil){
     for(const b of distAmounts){
       const m = val0(b.monto);
-      if(Math.abs(m - totalInversionistas) <= Math.abs(m - liquitech)) giroInv += m; else giroLiq += m;
+      const isInv = Math.abs(m - totalInversionistas) <= Math.abs(m - liquitech);
+      b.leg = isInv ? "inv" : "liq";   // línea a la que pertenece → define la cuenta destino fija
+      if(isInv) giroInv += m; else giroLiq += m;
     }
   }
   const giroTotal = giroInv + giroLiq;
@@ -3095,10 +3105,9 @@ initMailConfig();
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante + línea de crédito listos
 let SIIGO_CREDS_OK = false;            // solo credenciales (usuario + partner + access key)
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "" };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
-let TRANSFER_ACCOUNTS = {};            // { nit: { name, nit, dest } } cuentas destino del traslado
 const TRANSFER_POSTED = {};            // nit -> { number, id } traslados ya registrados en esta sesión
 
 const SIIGO_ACC_KEY = "va6s_siigo_accounts"; // fallback navegador (clave: invId)
@@ -3321,45 +3330,29 @@ async function registerAll(){
 //  Traslado entre cuentas — cuentas destino por beneficiario + registro en Siigo
 // ============================================================================
 function nitKeyDV(nit){ return String(nit == null ? "" : nit).split("-")[0].replace(/\D/g, ""); }
-async function loadTransferAccounts(){
-  if(window.api && window.api.siigoGetTransferAccounts){
-    try { TRANSFER_ACCOUNTS = (await window.api.siigoGetTransferAccounts()) || {}; return; } catch(_){}
-  }
-  try { TRANSFER_ACCOUNTS = JSON.parse(localStorage.getItem("va6s_transfer_accounts") || "{}"); }
-  catch(_){ TRANSFER_ACCOUNTS = {}; }
-}
-function transferDestFor(nit){ const e = TRANSFER_ACCOUNTS[ nitKeyDV(nit) ] || {}; return e.dest || ""; }
-async function saveTransferAccount(name, nit, dest){
-  const nt = nitKeyDV(nit);
-  if(!nt) return;
-  if(window.api && window.api.siigoSetTransferAccount){
-    try { TRANSFER_ACCOUNTS = (await window.api.siigoSetTransferAccount({ name, nit:nt, dest })) || TRANSFER_ACCOUNTS; return; } catch(_){}
-  }
-  const d = String(dest || "").trim();
-  if(d) TRANSFER_ACCOUNTS[nt] = { name:String(name || "").trim(), nit:nt, dest:d }; else delete TRANSFER_ACCOUNTS[nt];
-  try { localStorage.setItem("va6s_transfer_accounts", JSON.stringify(TRANSFER_ACCOUNTS)); } catch(_){}
-}
+// Cuenta destino fija según la línea del beneficiario (inv = fondeadores, liq = FIC).
+function transferDestForLeg(leg){ return ((leg === "liq" ? SIIGO_CFG.transferDestLiq : SIIGO_CFG.transferDestInv) || "").trim(); }
+function legLabel(leg){ return leg === "liq" ? "Liquitech (FIC)" : "Inversionistas (fondeadores)"; }
 function setTrState(idx, text, color){
   const el = document.querySelector('.tr-state[data-tr="' + idx + '"]');
   if(el){ el.textContent = text || ""; el.style.color = color || "var(--muted)"; }
 }
 function trasladoCardHTML(ben, idx){
-  const dest = transferDestFor(ben.nit);
+  const dest = transferDestForLeg(ben.leg);
   const origin = (SIIGO_CFG.transferOrigin || "").trim();
   const posted = TRANSFER_POSTED[ nitKeyDV(ben.nit) ];
   const postedTxt = posted ? ("✓ Comp. " + escHtml(String(posted.number))) : "";
   const sub = [ben.nit ? ("NIT " + escHtml(ben.nit)) : "", ben.cuenta ? ("Cta " + escHtml(ben.cuenta)) : "", ben.desc ? escHtml(ben.desc) : ""].filter(Boolean).join(" · ");
-  const acctLine = '<span class="ro-acct">Débito <b>' + (dest ? escHtml(dest) : "—") + '</b> (destino) · Crédito <b>' + escHtml(origin || "—") + '</b> (origen)</span>';
+  const legTag = '<span class="siigo-tag">' + escHtml(legLabel(ben.leg)) + '</span>';
+  const acctLine = dest
+    ? '<span class="ro-acct">Débito <b>' + escHtml(dest) + '</b> (destino) · Crédito <b>' + escHtml(origin || "—") + '</b> (origen)</span>'
+    : '<span class="ro-missing">Falta la cuenta destino de ' + escHtml(legLabel(ben.leg)) + ' (config. Siigo)</span>';
   return '<div class="inv-card">' +
     '<div class="inv-top">' +
-      '<span class="inv-name">' + escHtml(ben.name || "(sin nombre)") + ' <span class="siigo-tag">Traslado</span></span>' +
+      '<span class="inv-name">' + escHtml(ben.name || "(sin nombre)") + ' ' + legTag + '</span>' +
       '<span class="inv-meta">' + (sub || "—") + ' · ' + escHtml(fmtCOP(ben.monto)) + '</span>' +
     '</div>' +
-    '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' +
-      '<label style="font-size:12px;color:var(--muted)">Cuenta destino ' +
-        '<input class="tr-dest" data-idx="' + idx + '" inputmode="numeric" placeholder="p. ej. 11100510" value="' + escHtml(dest) + '" ' +
-        'style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:150px;color:var(--ink);background:#fff"></label>' +
-      acctLine +
+    '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' + acctLine +
       '<span style="flex:1"></span>' +
       '<button class="btn" data-act="tr-siigo" data-idx="' + idx + '">Registrar en Siigo</button>' +
       '<span class="tr-state" data-tr="' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' + postedTxt + '</span>' +
@@ -3368,17 +3361,9 @@ function trasladoCardHTML(ben, idx){
 async function renderTrasladoSection(){
   const sec = $("trasladoSection"), list = $("trasladoList");
   if(!sec || !list) return;
-  await loadTransferAccounts();
   sec.style.display = "";
   if($("trDate") && !$("trDate").value) $("trDate").value = serialToYMD(REFERENCE_SERIAL);
   list.innerHTML = trasladoBeneficiarios.map((b, i) => trasladoCardHTML(b, i)).join("");
-  list.querySelectorAll("input.tr-dest").forEach(inp => {
-    inp.addEventListener("change", async () => {
-      const i = Number(inp.dataset.idx); const b = trasladoBeneficiarios[i];
-      await saveTransferAccount(b.name, b.nit, inp.value.trim());
-      renderTrasladoSection();
-    });
-  });
   list.querySelectorAll('button[data-act="tr-siigo"]').forEach(btn => {
     btn.addEventListener("click", () => registerTraslado(Number(btn.dataset.idx)));
   });
@@ -3411,8 +3396,12 @@ async function registerTraslado(idx, opts){
     showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
     return false;
   }
-  const dest = transferDestFor(ben.nit);
-  if(!dest){ showToast("Configura la cuenta destino de " + (ben.name || ben.nit || "beneficiario") + ".", false); return false; }
+  const dest = transferDestForLeg(ben.leg);
+  if(!dest){
+    showToast("Configura la cuenta destino de " + legLabel(ben.leg) + " en la pantalla de Siigo.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return false;
+  }
   if(!(val0(ben.monto) > 0)){ showToast("El monto debe ser mayor que cero.", false); return false; }
   const date = ($("trDate") && $("trDate").value) || serialToYMD(REFERENCE_SERIAL);
   const key = nitKeyDV(ben.nit);
@@ -3455,8 +3444,8 @@ async function registerAllTraslado(){
     return;
   }
   const targets = [];
-  trasladoBeneficiarios.forEach((b, i) => { if(transferDestFor(b.nit) && val0(b.monto) > 0) targets.push(i); });
-  if(!targets.length){ showToast("Nada por registrar: configura las cuentas destino de los beneficiarios.", false); return; }
+  trasladoBeneficiarios.forEach((b, i) => { if(transferDestForLeg(b.leg) && val0(b.monto) > 0) targets.push(i); });
+  if(!targets.length){ showToast("Nada por registrar: configura las cuentas destino (Inversionistas y Liquitech) en la pantalla de Siigo.", false); return; }
   const date = ($("trDate") && $("trDate").value) || serialToYMD(REFERENCE_SERIAL);
   const missing = trasladoBeneficiarios.length - targets.length;
   const already = targets.filter(i => TRANSFER_POSTED[ nitKeyDV(trasladoBeneficiarios[i].nit) ]).length;
@@ -3484,7 +3473,7 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "" };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "" };
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
     SIIGO_CREDS_OK = !!(c.username && c.partnerId && c.hasAccessKey);
     SIIGO_READY = !!(SIIGO_CREDS_OK && cuentasOK);
@@ -3502,6 +3491,8 @@ async function initSiigoConfig(){
     el("sgCreditNit").value = c.creditNit || "";
     el("sgBankDebit").value = c.bankDebitAccount || "";
     if(el("sgTransferOrigin")) el("sgTransferOrigin").value = c.transferOriginAccount || "";
+    if(el("sgTransferDestInv")) el("sgTransferDestInv").value = c.transferDestInv || "";
+    if(el("sgTransferDestLiq")) el("sgTransferDestLiq").value = c.transferDestLiq || "";
     refreshReady(c);
   } catch(_){}
 
@@ -3515,6 +3506,8 @@ async function initSiigoConfig(){
       creditNit: el("sgCreditNit").value.trim(),
       bankDebitAccount: el("sgBankDebit").value.trim(),
       transferOriginAccount: el("sgTransferOrigin") ? el("sgTransferOrigin").value.trim() : "",
+      transferDestInv: el("sgTransferDestInv") ? el("sgTransferDestInv").value.trim() : "",
+      transferDestLiq: el("sgTransferDestLiq") ? el("sgTransferDestLiq").value.trim() : "",
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
     try {

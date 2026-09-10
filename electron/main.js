@@ -304,6 +304,8 @@ function getSiigoConfigPublic() {
     creditNit: s.siigoCreditNit || "",           // tercero fijo de la línea crédito (sin DV)
     bankDebitAccount: s.siigoBankDebitAccount || "", // cuenta débito para abonos a crédito (banco, p. ej. 21052504)
     transferOriginAccount: s.siigoTransferOriginAccount || "", // cuenta origen (banco Liquitech) para traslados entre cuentas
+    transferDestInv: s.siigoTransferDestInv || "",             // cuenta destino fija · línea Inversionistas (fondeadores)
+    transferDestLiq: s.siigoTransferDestLiq || "",             // cuenta destino fija · línea Liquitech (FIC)
   };
 }
 // NIT sin dígito de verificación (900.123.456-1 -> 900123456)
@@ -318,7 +320,7 @@ function getSiigoAccessKey() {
   }
   return s.siigoAccessKeyPlain || "";
 }
-function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount }) {
+function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq }) {
   const s = loadSettingsRaw();
   s.siigoPartnerId = (partnerId || "").trim();
   s.siigoUsername = (username || "").trim();
@@ -327,6 +329,8 @@ function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAcc
   if (creditNit !== undefined) s.siigoCreditNit = nitNoDV(creditNit);
   if (bankDebitAccount !== undefined) s.siigoBankDebitAccount = String(bankDebitAccount || "").trim();
   if (transferOriginAccount !== undefined) s.siigoTransferOriginAccount = String(transferOriginAccount || "").trim();
+  if (transferDestInv !== undefined) s.siigoTransferDestInv = String(transferDestInv || "").trim();
+  if (transferDestLiq !== undefined) s.siigoTransferDestLiq = String(transferDestLiq || "").trim();
   if (typeof accessKey === "string" && accessKey.trim().length) {
     const k = accessKey.trim();
     delete s.siigoAccessKeyPlain;
@@ -355,21 +359,6 @@ function setSiigoAccount({ name, nit, debit, credit }) {
   if (!entry.debit && !entry.credit) delete d[key];
   else d[key] = entry;
   writeJson(siigoAccountsPath(), d);
-  return d;
-}
-
-// Cuentas destino de traslados entre cuentas, por beneficiario (NIT sin DV): { [nit]: { name, nit, dest } }
-const siigoTransferAccountsPath = () => path.join(app.getPath("userData"), "siigo-transfer-accounts.json");
-function loadTransferAccounts() { return readJson(siigoTransferAccountsPath(), {}); }
-function setTransferAccount({ name, nit, dest }) {
-  const d = loadTransferAccounts();
-  const nt = nitNoDV(nit);
-  if (!nt) return d;
-  const cur = d[nt] || {};
-  const entry = { name: String(name || cur.name || "").trim(), nit: nt, dest: (dest != null ? String(dest).trim() : (cur.dest || "")) };
-  if (!entry.dest) delete d[nt];
-  else d[nt] = entry;
-  writeJson(siigoTransferAccountsPath(), d);
   return d;
 }
 
@@ -504,8 +493,6 @@ ipcMain.handle("siigo:getDocumentTypes", async () => {
 });
 ipcMain.handle("siigo:getAccounts", () => loadSiigoAccounts());
 ipcMain.handle("siigo:setAccount", (_e, payload) => setSiigoAccount(payload || {}));
-ipcMain.handle("siigo:getTransferAccounts", () => loadTransferAccounts());
-ipcMain.handle("siigo:setTransferAccount", (_e, payload) => setTransferAccount(payload || {}));
 ipcMain.handle("siigo:createJournal", async (_e, p) => {
   try {
     const s = loadSettingsRaw();
