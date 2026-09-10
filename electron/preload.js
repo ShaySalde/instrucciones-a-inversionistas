@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld("api", {
   siigoGetDocumentTypes: () => ipcRenderer.invoke("siigo:getDocumentTypes"),
   siigoGetAccounts: () => ipcRenderer.invoke("siigo:getAccounts"),
   siigoSetAccount: (payload) => ipcRenderer.invoke("siigo:setAccount", payload),
+  siigoGetTransferAccounts: () => ipcRenderer.invoke("siigo:getTransferAccounts"),
+  siigoSetTransferAccount: (payload) => ipcRenderer.invoke("siigo:setTransferAccount", payload),
   siigoCreateJournal: (payload) => ipcRenderer.invoke("siigo:createJournal", payload),
 
   // Utilidades

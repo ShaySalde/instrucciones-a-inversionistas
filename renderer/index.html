@@ -445,6 +445,13 @@
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Traslado entre cuentas</b> — cuenta origen (banco Liquitech) desde donde salen los giros:</p>
+    <div class="row" style="gap:16px;align-items:flex-start">
+      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta origen del traslado (fija)
+        <input type="text" id="sgTransferOrigin" inputmode="numeric" placeholder="p. ej. 11100501" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+    </div>
     <div class="row" style="margin-top:12px">
       <button class="btn primary" id="sgSave">💾 Guardar</button>
       <button class="btn" id="sgTest">🔌 Probar conexión</button>
@@ -485,6 +492,10 @@
         <p class="op-title">📧 Excel individual por inversionista</p>
         <p class="op-desc">Toma el payment tape crudo (.xlsx o .csv) y genera un <b>Excel independiente por cada inversionista</b> con 18 columnas clave. Luego puedes <b>enviar el reporte por correo</b> (con el Excel ya adjunto) a cada inversionista, uno por uno o todos a la vez.</p>
       </div>
+      <div class="op" data-op="traslado" id="opTraslado">
+        <p class="op-title">🔁 Traslado entre cuentas</p>
+        <p class="op-desc">Sube el <b>payment tape</b> y el archivo de <b>montos girados (distribution amount)</b>. Genera el <b>Resumen de instrucción con conciliación</b> (giro real vs. calculado; la diferencia = facturas no negociadas) y permite <b>contabilizar en Siigo</b> el traslado entre cuentas (un comprobante por beneficiario: débito cuenta destino, crédito cuenta origen).</p>
+      </div>
     </div>
   </section>
 
@@ -494,6 +505,12 @@
       <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
       <p class="big" id="dropTitle">Arrastra aquí tu archivo Excel o CSV o haz clic para seleccionar</p>
       <p class="small" id="dropSub">Formatos aceptados: .xlsx, .xlsm, .csv</p>
+    </label>
+
+    <label class="drop" id="drop2" style="display:none;margin-top:12px">
+      <input type="file" id="fileInput2" accept=".xlsx,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv">
+      <p class="big" id="drop2Title">Archivo de montos girados (distribution amount)</p>
+      <p class="small" id="drop2Sub">Beneficiario · NIT · cuenta · monto — para la conciliación y el traslado en Siigo</p>
     </label>
 
     <div class="row" style="margin-top:14px">
@@ -511,6 +528,19 @@
     <h2>3 · Envío de correos por inversionista</h2>
     <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">Para cada inversionista: verifica su correo (se guarda en el <b>directorio por NIT</b> de este equipo para la próxima vez) y haz clic en <b>Enviar</b> — el reporte sale desde tu Gmail configurado arriba con el <b>Excel ya adjunto</b>. Usa <b>Enviar a todos</b> para el lote completo. También puedes solo descargar el Excel o copiar el texto del correo.</p>
     <div id="individualList"></div>
+  </section>
+
+  <section class="card" id="trasladoSection" style="display:none">
+    <h2>3 · Traslado entre cuentas · Siigo</h2>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">Cada beneficiario del archivo de montos se contabiliza en Siigo como un <b>traslado entre cuentas independiente</b>: <b>débito</b> a su <b>cuenta destino</b> y <b>crédito</b> a la <b>cuenta origen</b> (banco Liquitech, configurada en la pantalla de Siigo). Configura la cuenta destino de cada beneficiario (se guarda por NIT en este equipo) y registra uno por uno o todos a la vez.</p>
+    <div class="row" id="trasladoTools" style="margin:10px 0 4px;gap:12px;align-items:center">
+      <label style="font-size:12px;color:var(--muted)">Fecha comprobante (Siigo):
+        <input type="date" id="trDate" style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--ink);background:#fff">
+      </label>
+      <button class="btn" id="btnDownloadTraslado">⬇ Descargar Excel (con conciliación)</button>
+      <button class="btn primary" id="btnRegisterAllTraslado">🧾 Registrar todos en Siigo</button>
+    </div>
+    <div id="trasladoList"></div>
   </section>
 
   </div><!-- /panelApp -->
@@ -1095,11 +1125,13 @@ async function readWorkbookFromFile(file){
 /* =========================================================
    Estado global
    ========================================================= */
-let currentOp = null;     // "limpieza" | "distribuir" | "individual"
+let currentOp = null;     // "limpieza" | "distribuir" | "individual" | "traslado"
 let currentFile = null;
+let currentFile2 = null;  // archivo de montos (distribution amount) — solo operación "traslado"
 let resultBlob = null;
 let resultName = null;
 let individualResults = []; // [{name, count, total, blob, fileName}]
+let trasladoBeneficiarios = []; // [{name, nit, cuenta, desc, monto}] del distribution amount
 
 /* =========================================================
    Selector de operación
@@ -1109,15 +1141,19 @@ document.querySelectorAll(".op").forEach(el => {
     document.querySelectorAll(".op").forEach(o => o.classList.remove("active"));
     el.classList.add("active");
     currentOp = el.dataset.op;
+    // El segundo archivo (montos) solo aplica al traslado entre cuentas
+    if($("drop2")) $("drop2").style.display = (currentOp === "traslado") ? "block" : "none";
     updateProcessButton();
   });
 });
 
 function updateProcessButton(){
-  const ready = currentOp && currentFile;
+  const needs2 = currentOp === "traslado";
+  const ready = currentOp && currentFile && (!needs2 || currentFile2);
   $("btnProcess").disabled = !ready;
   if(!currentOp) setStatus("Elige una operación", "");
-  else if(!currentFile) setStatus("Selecciona un archivo", "");
+  else if(!currentFile) setStatus("Selecciona el payment tape", "");
+  else if(needs2 && !currentFile2) setStatus("Falta el archivo de montos", "");
   else setStatus("Listo para procesar", "");
 }
 
@@ -1140,6 +1176,37 @@ fileInput.addEventListener("change", () => {
   if(f) setFile(f);
 });
 
+// Segundo archivo: montos girados (distribution amount) — solo traslado
+const drop2El = $("drop2"), fileInput2El = $("fileInput2");
+if(drop2El && fileInput2El){
+  ["dragenter","dragover"].forEach(ev => drop2El.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); drop2El.classList.add("drag");
+  }));
+  ["dragleave","drop"].forEach(ev => drop2El.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); drop2El.classList.remove("drag");
+  }));
+  drop2El.addEventListener("drop", e => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) setFile2(f);
+  });
+  fileInput2El.addEventListener("change", () => {
+    const f = fileInput2El.files && fileInput2El.files[0];
+    if(f) setFile2(f);
+  });
+}
+
+function setFile2(f){
+  if(!/\.(xlsx|xlsm|csv)$/i.test(f.name)){
+    showToast("Solo se aceptan archivos .xlsx, .xlsm o .csv", false);
+    return;
+  }
+  currentFile2 = f;
+  drop2El.classList.add("has-file");
+  $("drop2Title").textContent = "✓ " + f.name;
+  $("drop2Sub").textContent = (f.size/1024).toFixed(1) + " KB — haz clic para cambiar";
+  updateProcessButton();
+}
+
 function setFile(f){
   if(!/\.(xlsx|xlsm|csv)$/i.test(f.name)){
     showToast("Solo se aceptan archivos .xlsx, .xlsm o .csv", false);
@@ -1147,9 +1214,10 @@ function setFile(f){
   }
   currentFile = f;
   resultBlob = null; resultName = null;
-  individualResults = [];
+  individualResults = []; trasladoBeneficiarios = [];
   $("individualSection").style.display = "none";
   $("individualList").innerHTML = "";
+  if($("trasladoSection")) $("trasladoSection").style.display = "none";
   drop.classList.add("has-file");
   $("dropTitle").textContent = "✓ " + f.name;
   $("dropSub").textContent = (f.size/1024).toFixed(1) + " KB — haz clic para cambiar";
@@ -1161,14 +1229,18 @@ function setFile(f){
 }
 
 function resetAll(){
-  currentFile = null; resultBlob = null; resultName = null;
-  individualResults = [];
+  currentFile = null; currentFile2 = null; resultBlob = null; resultName = null;
+  individualResults = []; trasladoBeneficiarios = [];
   $("individualSection").style.display = "none";
   $("individualList").innerHTML = "";
+  if($("trasladoSection")) $("trasladoSection").style.display = "none";
   fileInput.value = "";
   drop.classList.remove("has-file");
   $("dropTitle").textContent = "Arrastra aquí tu archivo Excel o CSV o haz clic para seleccionar";
   $("dropSub").textContent = "Formatos aceptados: .xlsx, .xlsm, .csv";
+  if(fileInput2El){ fileInput2El.value = ""; drop2El.classList.remove("has-file");
+    $("drop2Title").textContent = "Archivo de montos girados (distribution amount)";
+    $("drop2Sub").textContent = "Beneficiario · NIT · cuenta · monto — para la conciliación y el traslado en Siigo"; }
   $("btnDownload").disabled = true;
   $("btnReset").disabled = true;
   logEl.innerHTML = "";
@@ -1192,6 +1264,7 @@ $("btnProcess").addEventListener("click", async () => {
     if(currentOp === "limpieza")   await runLimpiezaVa6s();
     if(currentOp === "distribuir") await runDistribuir();
     if(currentOp === "individual") await runIndividual();
+    if(currentOp === "traslado")   await runTraslado();
     setStatus("Listo", "ok");
     $("btnDownload").disabled = (currentOp === "individual") ? true : false;
     $("btnProcess").disabled = false;
@@ -1645,7 +1718,7 @@ function parsePaymentTape(wb){
 // Arma la hoja "Resumen de instrucción" (tabla de instrucciones como el correo + totales).
 // Liquitech se identifica por NIT (901228343); si falta la columna NIT, por nombre.
 const RESUMEN_LIQUITECH_NIT = "901228343";
-function buildResumenSheet(dat, targets, fecha){
+function buildResumenSheet(dat, targets, fecha, distAmounts){
   const idx = n => targets.indexOf(n);
   const iInvName = idx("Nombre Inversionista"), iFuente = idx("Nombre fuente de fondeo"),
         iNitInv = idx("NIT inversionista"), iTot = idx("Total para inversionista"),
@@ -1684,6 +1757,23 @@ function buildResumenSheet(dat, targets, fecha){
   const liquitech = totalRecibido - totalInversionistas;
   const margen = liquitech - capitalLiquitech - saldosAFavor;
 
+  // Conciliación con el archivo de montos girados (distribution amount).
+  // Cada beneficiario del archivo se clasifica hacia Inversionistas o Liquitech por cercanía de monto.
+  const hasConcil = Array.isArray(distAmounts) && distAmounts.length > 0;
+  let giroInv = 0, giroLiq = 0;
+  if(hasConcil){
+    for(const b of distAmounts){
+      const m = val0(b.monto);
+      if(Math.abs(m - totalInversionistas) <= Math.abs(m - liquitech)) giroInv += m; else giroLiq += m;
+    }
+  }
+  const giroTotal = giroInv + giroLiq;
+  const calcTotal = totalInversionistas + liquitech;
+  const diffInv = totalInversionistas - giroInv;
+  const diffLiq = liquitech - giroLiq;
+  const diffTotal = calcTotal - giroTotal;
+  const sumReint = reintegroItems.reduce((s, v) => s + v, 0);
+
   const cmp = (a, b) => a.localeCompare(b, "es", { sensitivity: "base" });
   const invSorted = [...invGroups.entries()].sort((a, b) => cmp(a[0], b[0]));
   const fuenteSorted = [...fuenteGroups.entries()].sort((a, b) => cmp(a[0], b[0]));
@@ -1708,22 +1798,45 @@ function buildResumenSheet(dat, targets, fecha){
     aoa.push(["", ""]);
     for(const v of reintegroItems){ aoa.push(["Reintegros de no negociadas", v]); reintRows.push(aoa.length - 1); }
   }
+  const lastMainRow = aoa.length - 1;
+
+  // Bloque de conciliación (4 columnas: Concepto · Giro real (archivo) · Calculado · Diferencia)
+  let concilTitleRow = -1, concilHeadRow = -1, concilReintRow = -1;
+  const concilValRows = [];
+  if(hasConcil){
+    aoa.push(["", ""]);
+    aoa.push(["Conciliación de giro (distribution amount)", "", "", ""]); concilTitleRow = aoa.length - 1;
+    aoa.push(["Concepto", "Giro real (archivo)", "Calculado", "Diferencia"]); concilHeadRow = aoa.length - 1;
+    aoa.push(["Inversionistas", giroInv, totalInversionistas, diffInv]); concilValRows.push(aoa.length - 1);
+    aoa.push(["Liquitech", giroLiq, liquitech, diffLiq]);                concilValRows.push(aoa.length - 1);
+    aoa.push(["Total girado", giroTotal, calcTotal, diffTotal]);         const rTotG = aoa.length - 1; concilValRows.push(rTotG);
+    aoa.push(["Facturas no negociadas (Σ reintegros)", "", "", sumReint]); concilReintRow = aoa.length - 1;
+  }
   const lastRow = aoa.length - 1;
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const CUR = '"$ "#,##0.00;[Red]-"$ "#,##0.00';
+  const nCols = hasConcil ? 4 : 2;
+  // Moneda en todas las celdas numéricas de las columnas de datos.
   for(let r = firstData; r <= lastRow; r++){
-    const a = XLSX.utils.encode_cell({ r, c: 1 });
-    if(ws[a] && typeof ws[a].v === "number"){ ws[a].t = "n"; ws[a].z = CUR; }
+    for(let c = 1; c < nCols; c++){
+      const a = XLSX.utils.encode_cell({ r, c });
+      if(ws[a] && typeof ws[a].v === "number"){ ws[a].t = "n"; ws[a].z = CUR; }
+    }
   }
-  ws["!cols"] = [{ wch: 52 }, { wch: 22 }];
-  ws["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:1} }, { s:{r:1,c:0}, e:{r:1,c:1} }];
+  ws["!cols"] = hasConcil ? [{ wch: 44 }, { wch: 22 }, { wch: 22 }, { wch: 18 }] : [{ wch: 52 }, { wch: 22 }];
+  const titleEnd = nCols - 1;
+  ws["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:titleEnd} }, { s:{r:1,c:0}, e:{r:1,c:titleEnd} }];
+  if(hasConcil){
+    ws["!merges"].push({ s:{r:concilTitleRow,c:0}, e:{r:concilTitleRow,c:titleEnd} });
+    ws["!merges"].push({ s:{r:concilReintRow,c:0}, e:{r:concilReintRow,c:2} });
+  }
   ws["!rows"] = []; ws["!rows"][0] = { hpt:30 }; ws["!rows"][1] = { hpt:20 }; ws["!rows"][2] = { hpt:24 };
 
   const solid = rgb => ({ patternType:"solid", fgColor:{ rgb } });
   const at = (r, c) => { const a = XLSX.utils.encode_cell({ r, c }); if(!ws[a]) ws[a] = { t:"s", v:"" }; return ws[a]; };
-  for(let c = 0; c <= 1; c++) at(0, c).s = { font:{ name:XL_FONT, sz:14, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.titleFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
-  for(let c = 0; c <= 1; c++) at(1, c).s = { font:{ name:XL_FONT, sz:10, italic:true, color:{ rgb:XLC.muted } }, fill:solid(XLC.subFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
+  for(let c = 0; c <= titleEnd; c++) at(0, c).s = { font:{ name:XL_FONT, sz:14, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.titleFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
+  for(let c = 0; c <= titleEnd; c++) at(1, c).s = { font:{ name:XL_FONT, sz:10, italic:true, color:{ rgb:XLC.muted } }, fill:solid(XLC.subFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
   at(2, 0).s = { font:{ name:XL_FONT, sz:10.5, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"left", vertical:"center" }, border:{ bottom:{ style:"medium", color:{ rgb:XLC.accentBlue } } } };
   at(2, 1).s = { font:{ name:XL_FONT, sz:10.5, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:"right", vertical:"center" }, border:{ bottom:{ style:"medium", color:{ rgb:XLC.accentBlue } } } };
   for(let r = firstData; r <= lastData; r++){
@@ -1752,10 +1865,26 @@ function buildResumenSheet(dat, targets, fecha){
     at(r, 0).s = { font:{ name:XL_FONT_DATA, sz:10, italic:true, color:{ rgb:XLC.muted } }, alignment:{ horizontal:"left", vertical:"center" }, border:bd };
     at(r, 1).s = { font:{ name:XL_FONT_DATA, sz:10, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"right", vertical:"center" }, border:bd };
   }
+
+  // Estilo del bloque de conciliación (4 columnas)
+  if(hasConcil){
+    for(let c = 0; c <= titleEnd; c++) at(concilTitleRow, c).s = { font:{ name:XL_FONT, sz:12, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.titleFill), alignment:{ horizontal:"left", vertical:"center", indent:1 } };
+    ws["!rows"][concilTitleRow] = { hpt:24 };
+    for(let c = 0; c <= titleEnd; c++) at(concilHeadRow, c).s = { font:{ name:XL_FONT, sz:10.5, bold:true, color:{ rgb:XLC.white } }, fill:solid(XLC.headFill), alignment:{ horizontal:(c === 0 ? "left" : "right"), vertical:"center" }, border:{ bottom:{ style:"medium", color:{ rgb:XLC.accentBlue } } } };
+    for(const r of concilValRows){
+      const isTot = (r === concilValRows[concilValRows.length - 1]);
+      const bd = isTot ? { top:{ style:"medium", color:{ rgb:XLC.headFill } } } : { bottom:{ style:"thin", color:{ rgb:XLC.border } } };
+      const baseFont = { name:(isTot ? XL_FONT : XL_FONT_DATA), sz:(isTot ? 11 : 10), bold:isTot, color:{ rgb:XLC.ink } };
+      at(r, 0).s = { font:baseFont, fill:(isTot ? solid(XLC.totalFill) : undefined), alignment:{ horizontal:"left", vertical:"center" }, border:bd };
+      for(let c = 1; c <= 3; c++) at(r, c).s = { font:baseFont, fill:(isTot ? solid(XLC.totalFill) : undefined), alignment:{ horizontal:"right", vertical:"center" }, border:bd };
+    }
+    at(concilReintRow, 0).s = { font:{ name:XL_FONT_DATA, sz:10, italic:true, color:{ rgb:XLC.muted } }, alignment:{ horizontal:"left", vertical:"center" } };
+    at(concilReintRow, 3).s = { font:{ name:XL_FONT_DATA, sz:10, bold:true, color:{ rgb:XLC.ink } }, alignment:{ horizontal:"right", vertical:"center" } };
+  }
   return ws;
 }
 
-async function runDistribuir(){
+async function runDistribuir(distAmounts){
   log("▶ Leyendo el libro…", "step");
   const wb = await readWorkbookFromFile(currentFile);
 
@@ -1787,9 +1916,9 @@ async function runDistribuir(){
   });
   insertSheet(wb, wsBase, "Base Distribuida", src.name);
 
-  // ---- 2) Resumen de instrucción ----
+  // ---- 2) Resumen de instrucción (con conciliación si vienen montos girados) ----
   log("▶ Generando \"Resumen de instrucción\"…", "step");
-  const wsResumen = buildResumenSheet(dat, DIST_TARGETS, fechaB);
+  const wsResumen = buildResumenSheet(dat, DIST_TARGETS, fechaB, distAmounts);
   insertSheet(wb, wsResumen, "Resumen de instrucción", src.name);
 
   // El entregable conserva la hoja original + "Base Distribuida" + "Resumen de instrucción".
@@ -1799,9 +1928,62 @@ async function runDistribuir(){
   const outBuf = XLSX.write(wb, { bookType:"xlsx", type:"array" });
   resultBlob = new Blob([outBuf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const base = currentFile.name.replace(/\.(xlsx|xlsm|csv)$/i, "");
-  resultName = base + " - Distribuido.xlsx";
+  resultName = base + (distAmounts && distAmounts.length ? " - Conciliación.xlsx" : " - Distribuido.xlsx");
   log("✓ Proceso completado con éxito.", "ok");
   log("Archivo listo: " + resultName + " (" + (resultBlob.size/1024).toFixed(1) + " KB)", "ok");
+}
+
+/* =========================================================
+   OPERACIÓN 4: Traslado entre cuentas (distribution amount)
+   ========================================================= */
+// Lee el archivo de montos girados. Detecta encabezados: Nombre Beneficiario · Documento · (No.) Cuenta · Descripción cuenta · Monto.
+function parseDistributionAmount(wb){
+  const norm = s => String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  let found = null;
+  for(const name of wb.SheetNames){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, blankrows:false, raw:true });
+    for(let i = 0; i < Math.min(rows.length, 12); i++){
+      const cells = (rows[i] || []).map(norm);
+      if(cells.some(c => c.includes("monto")) && cells.some(c => c.includes("beneficiario") || c.includes("nombre"))){
+        found = { rows, hIdx:i }; break;
+      }
+    }
+    if(found) break;
+  }
+  if(!found) throw new Error("El archivo de montos no tiene encabezados reconocibles (Nombre Beneficiario · Documento · Monto).");
+  const { rows, hIdx } = found;
+  const hdr = (rows[hIdx] || []).map(norm);
+  const iName = (() => { const a = hdr.findIndex(c => c.includes("nombre") && c.includes("beneficiario")); return a >= 0 ? a : hdr.findIndex(c => c.includes("nombre")); })();
+  const iNit  = hdr.findIndex(c => c.includes("documento") && !c.includes("tipo"));
+  const iCta  = hdr.findIndex(c => c.includes("cuenta") && !c.includes("tipo") && !c.includes("descripcion"));
+  const iDesc = hdr.findIndex(c => c.includes("descripcion"));
+  const iMon  = hdr.findIndex(c => c.includes("monto"));
+  const out = [];
+  for(let r = hIdx + 1; r < rows.length; r++){
+    const row = rows[r] || [];
+    const monto = iMon >= 0 ? val0(row[iMon]) : 0;
+    const nm = iName >= 0 ? String(row[iName] ?? "").trim() : "";
+    const nt = iNit  >= 0 ? String(row[iNit]  ?? "").trim() : "";
+    if(!nm && !nt && !(monto > 0)) continue;
+    out.push({
+      name: nm, nit: nt, monto,
+      cuenta: iCta  >= 0 ? String(row[iCta]  ?? "").trim() : "",
+      desc:   iDesc >= 0 ? String(row[iDesc] ?? "").trim() : "",
+    });
+  }
+  return out;
+}
+
+async function runTraslado(){
+  if(!currentFile2){ throw new Error("Falta el archivo de montos girados (distribution amount)."); }
+  log("▶ Leyendo archivo de montos (distribution amount)…", "step");
+  const wb2 = await readWorkbookFromFile(currentFile2);
+  trasladoBeneficiarios = parseDistributionAmount(wb2);
+  if(!trasladoBeneficiarios.length) throw new Error("No se encontraron beneficiarios con monto en el archivo de montos.");
+  log("• Beneficiarios detectados: " + trasladoBeneficiarios.length, "ok");
+  // Genera Base Distribuida + Resumen con conciliación (usa el payment tape en currentFile).
+  await runDistribuir(trasladoBeneficiarios);
+  await renderTrasladoSection();
 }
 
 /* =========================================================
@@ -2911,10 +3093,13 @@ initMailConfig();
 // ============================================================================
 //  Siigo — comprobantes contables por inversionista (solo en la app instalada)
 // ============================================================================
-let SIIGO_READY = false;               // credenciales + tipo de comprobante listos
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "" };
+let SIIGO_READY = false;               // credenciales + tipo de comprobante + línea de crédito listos
+let SIIGO_CREDS_OK = false;            // solo credenciales (usuario + partner + access key)
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
+let TRANSFER_ACCOUNTS = {};            // { nit: { name, nit, dest } } cuentas destino del traslado
+const TRANSFER_POSTED = {};            // nit -> { number, id } traslados ya registrados en esta sesión
 
 const SIIGO_ACC_KEY = "va6s_siigo_accounts"; // fallback navegador (clave: invId)
 async function loadSiigoAccounts(){
@@ -3132,6 +3317,165 @@ async function registerAll(){
   showToast("Registro en Siigo: " + ok + " ok" + (fail ? (", " + fail + " con error") : ""), fail === 0);
 }
 
+// ============================================================================
+//  Traslado entre cuentas — cuentas destino por beneficiario + registro en Siigo
+// ============================================================================
+function nitKeyDV(nit){ return String(nit == null ? "" : nit).split("-")[0].replace(/\D/g, ""); }
+async function loadTransferAccounts(){
+  if(window.api && window.api.siigoGetTransferAccounts){
+    try { TRANSFER_ACCOUNTS = (await window.api.siigoGetTransferAccounts()) || {}; return; } catch(_){}
+  }
+  try { TRANSFER_ACCOUNTS = JSON.parse(localStorage.getItem("va6s_transfer_accounts") || "{}"); }
+  catch(_){ TRANSFER_ACCOUNTS = {}; }
+}
+function transferDestFor(nit){ const e = TRANSFER_ACCOUNTS[ nitKeyDV(nit) ] || {}; return e.dest || ""; }
+async function saveTransferAccount(name, nit, dest){
+  const nt = nitKeyDV(nit);
+  if(!nt) return;
+  if(window.api && window.api.siigoSetTransferAccount){
+    try { TRANSFER_ACCOUNTS = (await window.api.siigoSetTransferAccount({ name, nit:nt, dest })) || TRANSFER_ACCOUNTS; return; } catch(_){}
+  }
+  const d = String(dest || "").trim();
+  if(d) TRANSFER_ACCOUNTS[nt] = { name:String(name || "").trim(), nit:nt, dest:d }; else delete TRANSFER_ACCOUNTS[nt];
+  try { localStorage.setItem("va6s_transfer_accounts", JSON.stringify(TRANSFER_ACCOUNTS)); } catch(_){}
+}
+function setTrState(idx, text, color){
+  const el = document.querySelector('.tr-state[data-tr="' + idx + '"]');
+  if(el){ el.textContent = text || ""; el.style.color = color || "var(--muted)"; }
+}
+function trasladoCardHTML(ben, idx){
+  const dest = transferDestFor(ben.nit);
+  const origin = (SIIGO_CFG.transferOrigin || "").trim();
+  const posted = TRANSFER_POSTED[ nitKeyDV(ben.nit) ];
+  const postedTxt = posted ? ("✓ Comp. " + escHtml(String(posted.number))) : "";
+  const sub = [ben.nit ? ("NIT " + escHtml(ben.nit)) : "", ben.cuenta ? ("Cta " + escHtml(ben.cuenta)) : "", ben.desc ? escHtml(ben.desc) : ""].filter(Boolean).join(" · ");
+  const acctLine = '<span class="ro-acct">Débito <b>' + (dest ? escHtml(dest) : "—") + '</b> (destino) · Crédito <b>' + escHtml(origin || "—") + '</b> (origen)</span>';
+  return '<div class="inv-card">' +
+    '<div class="inv-top">' +
+      '<span class="inv-name">' + escHtml(ben.name || "(sin nombre)") + ' <span class="siigo-tag">Traslado</span></span>' +
+      '<span class="inv-meta">' + (sub || "—") + ' · ' + escHtml(fmtCOP(ben.monto)) + '</span>' +
+    '</div>' +
+    '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' +
+      '<label style="font-size:12px;color:var(--muted)">Cuenta destino ' +
+        '<input class="tr-dest" data-idx="' + idx + '" inputmode="numeric" placeholder="p. ej. 11100510" value="' + escHtml(dest) + '" ' +
+        'style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:150px;color:var(--ink);background:#fff"></label>' +
+      acctLine +
+      '<span style="flex:1"></span>' +
+      '<button class="btn" data-act="tr-siigo" data-idx="' + idx + '">Registrar en Siigo</button>' +
+      '<span class="tr-state" data-tr="' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' + postedTxt + '</span>' +
+    '</div></div>';
+}
+async function renderTrasladoSection(){
+  const sec = $("trasladoSection"), list = $("trasladoList");
+  if(!sec || !list) return;
+  await loadTransferAccounts();
+  sec.style.display = "";
+  if($("trDate") && !$("trDate").value) $("trDate").value = serialToYMD(REFERENCE_SERIAL);
+  list.innerHTML = trasladoBeneficiarios.map((b, i) => trasladoCardHTML(b, i)).join("");
+  list.querySelectorAll("input.tr-dest").forEach(inp => {
+    inp.addEventListener("change", async () => {
+      const i = Number(inp.dataset.idx); const b = trasladoBeneficiarios[i];
+      await saveTransferAccount(b.name, b.nit, inp.value.trim());
+      renderTrasladoSection();
+    });
+  });
+  list.querySelectorAll('button[data-act="tr-siigo"]').forEach(btn => {
+    btn.addEventListener("click", () => registerTraslado(Number(btn.dataset.idx)));
+  });
+  const dl = $("btnDownloadTraslado");
+  if(dl) dl.onclick = () => {
+    if(!resultBlob) return;
+    const url = URL.createObjectURL(resultBlob);
+    const a = document.createElement("a");
+    a.href = url; a.download = resultName || "Conciliación.xlsx";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showToast("Descargando " + (resultName || "resultado"));
+  };
+  const rall = $("btnRegisterAllTraslado");
+  if(rall) rall.onclick = registerAllTraslado;
+}
+async function registerTraslado(idx, opts){
+  opts = opts || {};
+  const ben = trasladoBeneficiarios[idx];
+  if(!ben) return false;
+  if(!(window.api && window.api.siigoCreateJournal)){ showToast("Disponible en la app instalada.", false); return false; }
+  if(!SIIGO_CREDS_OK || !(SIIGO_CFG.documentId || "").trim()){
+    showToast("Configura Siigo (credenciales + tipo de comprobante) antes de registrar.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return false;
+  }
+  const origin = (SIIGO_CFG.transferOrigin || "").trim();
+  if(!origin){
+    showToast("Configura la cuenta origen del traslado en la pantalla de Siigo.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return false;
+  }
+  const dest = transferDestFor(ben.nit);
+  if(!dest){ showToast("Configura la cuenta destino de " + (ben.name || ben.nit || "beneficiario") + ".", false); return false; }
+  if(!(val0(ben.monto) > 0)){ showToast("El monto debe ser mayor que cero.", false); return false; }
+  const date = ($("trDate") && $("trDate").value) || serialToYMD(REFERENCE_SERIAL);
+  const key = nitKeyDV(ben.nit);
+  if(!opts.fromBulk && TRANSFER_POSTED[key]){
+    if(!window.confirm("Ya registraste el traslado de " + (ben.name || ben.nit) + " (comprobante " + TRANSFER_POSTED[key].number + ").\n\n¿Registrar OTRO comprobante?")) return false;
+  }
+  if(!opts.fromBulk){
+    const preview = "Registrar TRASLADO ENTRE CUENTAS en Siigo:\n\n" +
+      "Beneficiario: " + (ben.name || "—") + "\nNIT: " + (ben.nit || "—") + "\nFecha: " + date + "\nMonto: " + fmtCOP(ben.monto) + "\n\n" +
+      "Débito  · cuenta " + dest + " (destino)\n" +
+      "Crédito · cuenta " + origin + " (origen)\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
+    if(!window.confirm(preview)) return false;
+  }
+  setTrState(idx, "Registrando…", "var(--warn)");
+  try {
+    const res = await window.api.siigoCreateJournal({
+      mode:"transfer", date, value: val0(ben.monto), nit: ben.nit, name: ben.name,
+      destAccount: dest, originAccount: origin, documentId: SIIGO_CFG.documentId,
+    });
+    if(res && res.ok){
+      TRANSFER_POSTED[key] = { number: res.number, id: res.id };
+      setTrState(idx, "✓ Comp. " + res.number, "var(--ok)");
+      log("✓ Siigo (traslado): comprobante " + res.number + " — " + (ben.name || ben.nit) + " · " + fmtCOP(ben.monto), "ok");
+      return true;
+    }
+    setTrState(idx, "✗ Error", "var(--err)");
+    log("✗ Siigo error traslado (" + (ben.name || ben.nit) + "): " + (res && res.error), "err");
+    showToast("Error registrando traslado: " + (ben.name || ben.nit), false);
+    return false;
+  } catch(err){
+    setTrState(idx, "✗ Error", "var(--err)");
+    log("✗ Siigo error traslado: " + (err && err.message || err), "err");
+    return false;
+  }
+}
+async function registerAllTraslado(){
+  if(!SIIGO_CREDS_OK || !(SIIGO_CFG.documentId || "").trim() || !(SIIGO_CFG.transferOrigin || "").trim()){
+    showToast("Configura Siigo (credenciales, tipo de comprobante y cuenta origen) antes de registrar.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return;
+  }
+  const targets = [];
+  trasladoBeneficiarios.forEach((b, i) => { if(transferDestFor(b.nit) && val0(b.monto) > 0) targets.push(i); });
+  if(!targets.length){ showToast("Nada por registrar: configura las cuentas destino de los beneficiarios.", false); return; }
+  const date = ($("trDate") && $("trDate").value) || serialToYMD(REFERENCE_SERIAL);
+  const missing = trasladoBeneficiarios.length - targets.length;
+  const already = targets.filter(i => TRANSFER_POSTED[ nitKeyDV(trasladoBeneficiarios[i].nit) ]).length;
+  let msg = "Vas a registrar " + targets.length + " traslado(s) en Siigo con fecha " + date + ".";
+  if(missing > 0) msg += "\n" + missing + " sin cuenta destino se omitirán.";
+  if(already > 0) msg += "\n⚠ " + already + " ya fueron registrados en esta sesión; se registrarán de nuevo.";
+  msg += "\n\nEsto ESCRIBE en tu contabilidad. ¿Continuar?";
+  if(!window.confirm(msg)) return;
+  const btn = $("btnRegisterAllTraslado"); if(btn) btn.disabled = true;
+  let ok = 0, fail = 0;
+  for(const idx of targets){
+    const done = await registerTraslado(idx, { fromBulk:true });
+    if(done) ok++; else fail++;
+    await new Promise(res => setTimeout(res, 400));
+  }
+  if(btn) btn.disabled = false;
+  showToast("Traslados en Siigo: " + ok + " ok" + (fail ? (", " + fail + " con error") : ""), fail === 0);
+}
+
 async function initSiigoConfig(){
   const el = id => document.getElementById(id);
   if(!el("sgUser")) return;
@@ -3140,9 +3484,10 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "" };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "" };
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
-    SIIGO_READY = !!(c.username && c.partnerId && c.hasAccessKey && cuentasOK);
+    SIIGO_CREDS_OK = !!(c.username && c.partnerId && c.hasAccessKey);
+    SIIGO_READY = !!(SIIGO_CREDS_OK && cuentasOK);
     el("sgStatus").textContent = SIIGO_READY ? "Configurado ✓"
       : (!c.hasAccessKey ? "Sin configurar"
       : (!c.documentId ? "Falta el tipo de comprobante" : "Falta la línea de crédito fija"));
@@ -3156,6 +3501,7 @@ async function initSiigoConfig(){
     el("sgCreditAcct").value = c.creditAccount || "";
     el("sgCreditNit").value = c.creditNit || "";
     el("sgBankDebit").value = c.bankDebitAccount || "";
+    if(el("sgTransferOrigin")) el("sgTransferOrigin").value = c.transferOriginAccount || "";
     refreshReady(c);
   } catch(_){}
 
@@ -3168,6 +3514,7 @@ async function initSiigoConfig(){
       creditAccount: el("sgCreditAcct").value.trim(),
       creditNit: el("sgCreditNit").value.trim(),
       bankDebitAccount: el("sgBankDebit").value.trim(),
+      transferOriginAccount: el("sgTransferOrigin") ? el("sgTransferOrigin").value.trim() : "",
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
     try {
