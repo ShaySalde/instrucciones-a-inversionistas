@@ -552,7 +552,8 @@ ipcMain.handle("siigo:createJournal", async (_e, p) => {
       if (!benNit) return { ok: false, error: "Falta el NIT del beneficiario." };
       if (!(v > 0)) return { ok: false, error: "El monto debe ser mayor que cero." };
       if (!p2.date) return { ok: false, error: "Falta la fecha del comprobante." };
-      const descT = trunc100("Traslado entre cuentas " + benName + " (" + fechaTxt0 + ")");
+      const descBaseT = p2.description ? String(p2.description) : ("Traslado entre cuentas " + benName);
+      const descT = trunc100(descBaseT + " (" + fechaTxt0 + ")");
       const itemsT = [
         { account: { code: destAccount, movement: "Debit" }, value: v, description: descT, customer: { identification: benNit, branch_office: 0 } },
         { account: { code: originAccount, movement: "Credit" }, value: v, description: descT, customer: { identification: benNit, branch_office: 0 } },
