@@ -306,6 +306,8 @@ function getSiigoConfigPublic() {
     transferOriginAccount: s.siigoTransferOriginAccount || "", // cuenta origen (banco Liquitech) para traslados entre cuentas
     transferDestInv: s.siigoTransferDestInv || "",             // cuenta destino fija · línea Inversionistas (fondeadores)
     transferDestLiq: s.siigoTransferDestLiq || "",             // cuenta destino fija · línea Liquitech (FIC)
+    devolDebit: s.siigoDevolDebit || "",                       // cuenta débito · devolución de facturas no negociadas
+    devolCredit: s.siigoDevolCredit || "",                     // cuenta crédito · devolución de facturas no negociadas
   };
 }
 // NIT sin dígito de verificación (900.123.456-1 -> 900123456)
@@ -320,7 +322,7 @@ function getSiigoAccessKey() {
   }
   return s.siigoAccessKeyPlain || "";
 }
-function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq }) {
+function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq, devolDebit, devolCredit }) {
   const s = loadSettingsRaw();
   s.siigoPartnerId = (partnerId || "").trim();
   s.siigoUsername = (username || "").trim();
@@ -331,6 +333,8 @@ function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAcc
   if (transferOriginAccount !== undefined) s.siigoTransferOriginAccount = String(transferOriginAccount || "").trim();
   if (transferDestInv !== undefined) s.siigoTransferDestInv = String(transferDestInv || "").trim();
   if (transferDestLiq !== undefined) s.siigoTransferDestLiq = String(transferDestLiq || "").trim();
+  if (devolDebit !== undefined) s.siigoDevolDebit = String(devolDebit || "").trim();
+  if (devolCredit !== undefined) s.siigoDevolCredit = String(devolCredit || "").trim();
   if (typeof accessKey === "string" && accessKey.trim().length) {
     const k = accessKey.trim();
     delete s.siigoAccessKeyPlain;
@@ -536,6 +540,30 @@ ipcMain.handle("siigo:createJournal", async (_e, p) => {
       if (!rb.ok) return { ok: false, error: siigoErr(rb) };
       const db = rb.data || {};
       return { ok: true, id: db.id, number: db.number || db.name || (db.document && db.document.number) || db.id };
+    }
+
+    // ---- Modo DEVOLUCIÓN de facturas no negociadas: un comprobante por factura ----
+    //   Débito / Crédito con cuentas fijas de devolución · tercero = NIT ingresado a mano.
+    if (p2.mode === "devolucion") {
+      const debitAccount = String(p2.debitAccount || s.siigoDevolDebit || "").trim();
+      const creditAccount = String(p2.creditAccount || s.siigoDevolCredit || "").trim();
+      const nit = nitNoDV(p2.nit || "");
+      const v = Number(p2.value) || 0;
+      if (!debitAccount || !creditAccount) return { ok: false, error: "Faltan las cuentas de devolución (configúralas en Siigo)." };
+      if (!nit) return { ok: false, error: "Falta el NIT del tercero de la devolución." };
+      if (!(v > 0)) return { ok: false, error: "El monto debe ser mayor que cero." };
+      if (!p2.date) return { ok: false, error: "Falta la fecha del comprobante." };
+      const descBaseD = p2.description ? String(p2.description) : "Devolución factura no negociada";
+      const descD = trunc100(descBaseD + " (" + fechaTxt0 + ")");
+      const itemsD = [
+        { account: { code: debitAccount, movement: "Debit" }, value: v, description: descD, customer: { identification: nit, branch_office: 0 } },
+        { account: { code: creditAccount, movement: "Credit" }, value: v, description: descD, customer: { identification: nit, branch_office: 0 } },
+      ];
+      const payloadD = { document: { id: Number(docId) }, date: p2.date, items: itemsD, observations: descD };
+      const rd = await siigoFetch("/v1/journals", { method: "POST", body: JSON.stringify(payloadD) });
+      if (!rd.ok) return { ok: false, error: siigoErr(rd) };
+      const dd = rd.data || {};
+      return { ok: true, id: dd.id, number: dd.number || dd.name || (dd.document && dd.document.number) || dd.id };
     }
 
     // ---- Modo TRASLADO entre cuentas: un comprobante por beneficiario ----

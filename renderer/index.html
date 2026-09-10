@@ -338,6 +338,7 @@
   <nav class="nav-tabs" role="tablist">
     <button class="nav-tab active" data-panel="panelConfig" role="tab">⚙ Configuración</button>
     <button class="nav-tab" data-panel="panelApp" role="tab">▶ Operación</button>
+    <button class="nav-tab" data-panel="panelSiigo" role="tab">🧾 Contabilidad</button>
   </nav>
 
   <div class="nav-panel active" id="panelConfig" role="tabpanel">
@@ -461,6 +462,17 @@
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Devolución de facturas no negociadas</b> — cuentas fijas. Cada factura no negociada genera un comprobante (Débito / Crédito) con el <b>NIT del tercero que escribes a mano</b> en la pestaña Contabilidad.</p>
+    <div class="row" style="gap:16px;align-items:flex-start">
+      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta débito · devolución
+        <input type="text" id="sgDevolDebit" inputmode="numeric" placeholder="código contable" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta crédito · devolución
+        <input type="text" id="sgDevolCredit" inputmode="numeric" placeholder="código contable" autocomplete="off"
+          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
+      </label>
+    </div>
     <div class="row" style="margin-top:12px">
       <button class="btn primary" id="sgSave">💾 Guardar</button>
       <button class="btn" id="sgTest">🔌 Probar conexión</button>
@@ -539,8 +551,32 @@
     <div id="individualList"></div>
   </section>
 
+  </div><!-- /panelApp -->
+
+  <div class="nav-panel" id="panelSiigo" role="tabpanel">
+
+  <section class="card">
+    <h2>🧾 Contabilización en Siigo</h2>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">Aquí registras en Siigo lo que procesaste en <b>Operación</b>: comprobantes por <b>inversionista</b>, el <b>traslado entre cuentas</b> y la <b>devolución de facturas no negociadas</b>. Las cuentas se configuran en <b>Configuración → 🧾 Siigo</b>.</p>
+    <p id="siigoEmpty" style="color:var(--muted);font-size:13px;margin-top:8px">Aún no has procesado nada. Ve a <b>Operación</b>, procesa un archivo y vuelve a esta pestaña.</p>
+  </section>
+
+  <section class="card" id="siigoInvSection" style="display:none">
+    <h2>Inversionistas</h2>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">Un comprobante por inversionista: restitución (débito cuenta del inversionista / crédito fija) y, para las fuentes de fondeo, abono a crédito financiero.</p>
+    <div class="row" id="siigoInvTools" style="margin:10px 0 4px;gap:12px;align-items:center">
+      <label style="font-size:12px;color:var(--muted)">Fecha comprobante (Siigo):
+        <input type="date" id="sgDate" style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--ink);background:#fff">
+      </label>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="btnRegisterAll">🧾 Registrar todos en Siigo</button>
+      <span class="status-pill" id="registerAllStatus"></span>
+    </div>
+    <div id="siigoInvList"></div>
+  </section>
+
   <section class="card" id="trasladoSection" style="display:none">
-    <h2>3 · Traslado entre cuentas · Siigo</h2>
+    <h2>Traslado entre cuentas</h2>
     <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">El traslado se contabiliza en Siigo en 2 movimientos, ambos <b>desde la cuenta origen</b>: <b>1)</b> la parte de <b>inversionistas</b> a la <b>cuenta que dispersa a inversionistas</b> (Débito B / Crédito Origen); <b>2)</b> la parte de <b>Liquitech al FIC</b> (Débito FIC / Crédito Origen). Las cuentas se configuran fijas en la pantalla de Siigo.</p>
     <div class="row" id="trasladoTools" style="margin:10px 0 4px;gap:12px;align-items:center">
       <label style="font-size:12px;color:var(--muted)">Fecha comprobante (Siigo):
@@ -552,7 +588,20 @@
     <div id="trasladoList"></div>
   </section>
 
-  </div><!-- /panelApp -->
+  <section class="card" id="devolSection" style="display:none">
+    <h2>Devolución de facturas no negociadas</h2>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">Cada factura no negociada solo trae el <b>valor</b>. Escribe el <b>NIT del tercero</b> a mano y registra: se genera un comprobante por factura (Débito / Crédito con las <b>cuentas de devolución</b> configuradas en Siigo).</p>
+    <div class="row" id="devolTools" style="margin:10px 0 4px;gap:12px;align-items:center">
+      <label style="font-size:12px;color:var(--muted)">Fecha comprobante (Siigo):
+        <input type="date" id="devDate" style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--ink);background:#fff">
+      </label>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="btnRegisterAllDevol">🧾 Registrar todas</button>
+    </div>
+    <div id="devolList"></div>
+  </section>
+
+  </div><!-- /panelSiigo -->
 
   <footer><b>Liquitech</b> · Instrucciones a Inversionistas — herramienta autocontenida, funciona sin conexión a internet.</footer>
 </div>
@@ -1141,6 +1190,7 @@ let resultBlob = null;
 let resultName = null;
 let individualResults = []; // [{name, count, total, blob, fileName}]
 let trasladoBeneficiarios = []; // [{name, nit, cuenta, desc, monto}] del distribution amount
+let reintegros = [];            // [{valor, factura, emisor, deudor, nit, concepto}] facturas no negociadas (para devolución)
 
 /* =========================================================
    Selector de operación
@@ -1239,10 +1289,10 @@ function setFile(f){
 
 function resetAll(){
   currentFile = null; currentFile2 = null; resultBlob = null; resultName = null;
-  individualResults = []; trasladoBeneficiarios = [];
+  individualResults = []; trasladoBeneficiarios = []; reintegros = [];
   $("individualSection").style.display = "none";
   $("individualList").innerHTML = "";
-  if($("trasladoSection")) $("trasladoSection").style.display = "none";
+  if(typeof renderContabilidad === "function") renderContabilidad();
   fileInput.value = "";
   drop.classList.remove("has-file");
   $("dropTitle").textContent = "Arrastra aquí tu archivo Excel o CSV o haz clic para seleccionar";
@@ -1268,6 +1318,8 @@ $("btnProcess").addEventListener("click", async () => {
   $("individualList").innerHTML = "";
   setStatus("Procesando…", "");
   logEl.innerHTML = "";
+  // Cada corrida reinicia los datos de contabilización (evita mezclar operaciones)
+  individualResults = []; trasladoBeneficiarios = []; reintegros = []; DEVOL_POSTED = {};
 
   try {
     if(currentOp === "limpieza")   await runLimpiezaVa6s();
@@ -1275,6 +1327,7 @@ $("btnProcess").addEventListener("click", async () => {
     if(currentOp === "individual") await runIndividual();
     if(currentOp === "traslado")   await runTraslado();
     setStatus("Listo", "ok");
+    renderContabilidad();
     $("btnDownload").disabled = (currentOp === "individual") ? true : false;
     $("btnProcess").disabled = false;
     showToast("Proceso completado");
@@ -1732,7 +1785,8 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
   const iInvName = idx("Nombre Inversionista"), iFuente = idx("Nombre fuente de fondeo"),
         iNitInv = idx("NIT inversionista"), iTot = idx("Total para inversionista"),
         iRec = idx("Valor recibido"),
-        iSal = idx("Saldo a favor/ contra"), iVInv = idx("Valor Invertido");
+        iSal = idx("Saldo a favor/ contra"), iVInv = idx("Valor Invertido"),
+        iFactura = idx("No. Factura"), iEmisor = idx("Emisor"), iDeudor = idx("Deudor");
   const nitKey = v => String(v == null ? "" : v).split("-")[0].replace(/\D/g, "");
   const isLiq = r => (iNitInv >= 0 && nitKey(r[iNitInv]))
     ? (nitKey(r[iNitInv]) === RESUMEN_LIQUITECH_NIT)
@@ -1754,7 +1808,12 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
       const nm = String((iInvName >= 0 ? r[iInvName] : "") ?? "").trim();
       const t = iTot >= 0 ? val0(r[iTot]) : 0;
       // Sin nombre = reintegro de no negociada: cada uno como ítem propio (no se suman en una línea).
-      if(nm === "") reintegroItems.push(t);
+      if(nm === "") reintegroItems.push({
+        valor: t,
+        factura: String((iFactura >= 0 ? r[iFactura] : "") ?? "").trim(),
+        emisor:  String((iEmisor  >= 0 ? r[iEmisor]  : "") ?? "").trim(),
+        deudor:  String((iDeudor  >= 0 ? r[iDeudor]  : "") ?? "").trim(),
+      });
       else invGroups.set(nm, (invGroups.get(nm) || 0) + t);
     }
   }
@@ -1783,7 +1842,8 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
   const diffInv = totalInversionistas - giroInv;
   const diffLiq = liquitech - giroLiq;
   const diffTotal = calcTotal - giroTotal;
-  const sumReint = reintegroItems.reduce((s, v) => s + v, 0);
+  const sumReint = reintegroItems.reduce((s, v) => s + v.valor, 0);
+  reintegros = reintegroItems;   // expone las no negociadas para la pestaña Contabilidad (devolución)
 
   const cmp = (a, b) => a.localeCompare(b, "es", { sensitivity: "base" });
   const invSorted = [...invGroups.entries()].sort((a, b) => cmp(a[0], b[0]));
@@ -1807,7 +1867,7 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
   const reintRows = [];
   if(reintegroItems.length){
     aoa.push(["", ""]);
-    for(const v of reintegroItems){ aoa.push(["Reintegros de no negociadas", v]); reintRows.push(aoa.length - 1); }
+    for(const v of reintegroItems){ aoa.push(["Reintegros de no negociadas", v.valor]); reintRows.push(aoa.length - 1); }
   }
   const lastMainRow = aoa.length - 1;
 
@@ -1994,7 +2054,7 @@ async function runTraslado(){
   log("• Beneficiarios detectados: " + trasladoBeneficiarios.length, "ok");
   // Genera Base Distribuida + Resumen con conciliación (usa el payment tape en currentFile).
   await runDistribuir(trasladoBeneficiarios);
-  await renderTrasladoSection();
+  renderContabilidad();  // traslado + devolución quedan listos en la pestaña Contabilidad
 }
 
 /* =========================================================
@@ -2480,22 +2540,6 @@ async function renderIndividualResults(syncNew){
     list.appendChild(warn);
   }
 
-  if(SIIGO_READY){
-    const sbar = document.createElement("div");
-    sbar.className = "row";
-    sbar.style.margin = "0 0 12px";
-    sbar.innerHTML =
-      '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:500">' +
-        'Fecha comprobante (Siigo):' +
-        '<input type="date" id="sgDate" value="' + serialToYMD(REFERENCE_SERIAL) + '" ' +
-          'style="border:1px solid var(--hairline);border-radius:9px;padding:7px 10px;font-family:inherit;font-size:13px;color:var(--ink);background:#fff">' +
-      '</label>' +
-      '<span style="flex:1"></span>' +
-      '<button class="btn" id="btnRegisterAll">🧾 Registrar todos en Siigo</button>' +
-      '<span class="status-pill" id="registerAllStatus"></span>';
-    list.appendChild(sbar);
-  }
-
   individualResults.forEach((r, idx) => {
     const emails = dirEmailsFor(r.name, r.nit);
     const emailsHtml = emails.length
@@ -2519,7 +2563,6 @@ async function renderIndividualResults(syncNew){
           '<button class="btn ghost-dark" data-act="copy" data-idx="' + idx + '">📋 Copiar</button>' +
           '<span class="inv-state" data-state="' + idx + '" style="font-size:12.5px;font-weight:600;align-self:center"></span>' +
         '</div>' +
-        siigoCardHTML(r, idx) +
         '<textarea readonly data-idx="' + idx + '">Asunto: ' + draft.subject + '\n\n' + draft.body + '</textarea>';
       list.appendChild(card);
       return;
@@ -2542,7 +2585,6 @@ async function renderIndividualResults(syncNew){
         '<button class="btn ghost-dark" data-act="copy" data-idx="' + idx + '">📋 Copiar</button>' +
         '<span class="inv-state" data-state="' + idx + '" style="font-size:12.5px;font-weight:600;align-self:center"></span>' +
       '</div>' +
-      siigoCardHTML(r, idx) +
       '<textarea readonly data-idx="' + idx + '">Asunto: ' + draft.subject + '\n\n' + draft.body + '</textarea>';
     list.appendChild(card);
   });
@@ -2572,8 +2614,8 @@ async function renderIndividualResults(syncNew){
     });
   });
 
-  // Enlaces "⚙ Configurar/Editar" → saltan al directorio en la pestaña Configuración
-  list.querySelectorAll('button[data-act="cfg-mail"], button[data-act="cfg-siigo"]').forEach(btn => {
+  // Enlaces "⚙ Configurar/Editar" del correo → saltan al directorio en la pestaña Configuración
+  list.querySelectorAll('button[data-act="cfg-mail"]').forEach(btn => {
     btn.addEventListener("click", () => {
       const r = individualResults[Number(btn.dataset.idx)];
       jumpToDirectory(r.name, r.nit);
@@ -2615,15 +2657,8 @@ async function renderIndividualResults(syncNew){
   });
   $("btnSendAll").addEventListener("click", sendAll);
 
-  if(SIIGO_READY){
-    list.querySelectorAll('button[data-act="siigo"]').forEach(btn => {
-      btn.addEventListener("click", () => registerOne(Number(btn.dataset.idx)));
-    });
-    const rall = $("btnRegisterAll");
-    if(rall) rall.addEventListener("click", registerAll);
-  }
-
   $("individualSection").style.display = individualResults.length ? "" : "none";
+  renderContabilidad();  // el registro de Siigo vive en la pestaña Contabilidad
 }
 
 // Verifica que el correo esté configurado antes de enviar; enfoca la config si falta.
@@ -3106,10 +3141,11 @@ initMailConfig();
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante + línea de crédito listos
 let SIIGO_CREDS_OK = false;            // solo credenciales (usuario + partner + access key)
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "" };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", devolDebit: "", devolCredit: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
 const TRANSFER_POSTED = {};            // nit -> { number, id } traslados ya registrados en esta sesión
+let DEVOL_POSTED = {};                 // idx -> { number, id } devoluciones ya registradas (se reinicia por corrida)
 
 const SIIGO_ACC_KEY = "va6s_siigo_accounts"; // fallback navegador (clave: invId)
 async function loadSiigoAccounts(){
@@ -3392,9 +3428,10 @@ function movimientoCardHTML(mov){
       '<span class="tr-state" data-tr="' + mov.id + '" style="font-size:12px;font-weight:600;align-self:center">' + postedTxt + '</span>' +
     '</div></div>';
 }
-async function renderTrasladoSection(){
+function renderTrasladoSection(){
   const sec = $("trasladoSection"), list = $("trasladoList");
   if(!sec || !list) return;
+  if(!trasladoBeneficiarios.length){ sec.style.display = "none"; return; }
   sec.style.display = "";
   if($("trDate") && !$("trDate").value) $("trDate").value = serialToYMD(REFERENCE_SERIAL);
   list.innerHTML = computeTrasladoMovimientos().map(movimientoCardHTML).join("");
@@ -3491,6 +3528,156 @@ async function registerAllTraslado(){
   showToast("Traslados en Siigo: " + ok + " ok" + (fail ? (", " + fail + " con error") : ""), fail === 0);
 }
 
+// ============================================================================
+//  Pestaña Contabilidad — orquesta el registro de inversionistas, traslado y devolución
+// ============================================================================
+function renderContabilidad(){
+  renderSiigoInvestors();
+  renderTrasladoSection();
+  renderDevolucion();
+  const any = individualResults.length || trasladoBeneficiarios.length || reintegros.length;
+  if($("siigoEmpty")) $("siigoEmpty").style.display = any ? "none" : "";
+}
+
+// --- Sección Inversionistas (mueve el registro que estaba en Operación) ---
+function renderSiigoInvestors(){
+  const sec = $("siigoInvSection"), list = $("siigoInvList");
+  if(!sec || !list) return;
+  if(!individualResults.length){ sec.style.display = "none"; return; }
+  sec.style.display = "";
+  if($("sgDate") && !$("sgDate").value) $("sgDate").value = serialToYMD(REFERENCE_SERIAL);
+  const tools = $("siigoInvTools");
+  if(!SIIGO_READY){
+    if(tools) tools.style.display = "none";
+    list.innerHTML = '<p class="ro-missing" style="font-size:13px">Configura Siigo (credenciales, tipo de comprobante y línea de crédito fija) en <b>Configuración → 🧾 Siigo</b> para poder registrar.</p>';
+    return;
+  }
+  if(tools) tools.style.display = "";
+  list.innerHTML = individualResults.map((r, idx) => {
+    const meta = 'NIT ' + escHtml(r.nit || "—") + ' · ' + escHtml(fmtCOP(r.total)) + (r.kind === "bank" ? ' · abono a crédito' : '');
+    return '<div class="inv-card"><div class="inv-top">' +
+        '<span class="inv-name">' + escHtml(r.name) + '</span>' +
+        '<span class="inv-meta">' + meta + '</span>' +
+      '</div>' + siigoCardHTML(r, idx) + '</div>';
+  }).join("");
+  list.querySelectorAll('button[data-act="siigo"]').forEach(btn => btn.addEventListener("click", () => registerOne(Number(btn.dataset.idx))));
+  list.querySelectorAll('button[data-act="cfg-siigo"]').forEach(btn => btn.addEventListener("click", () => { const r = individualResults[Number(btn.dataset.idx)]; jumpToDirectory(r.name, r.nit); }));
+  const rall = $("btnRegisterAll");
+  if(rall) rall.onclick = registerAll;
+}
+
+// --- Sección Devolución de facturas no negociadas ---
+function devolReady(){ return !!(SIIGO_CREDS_OK && (SIIGO_CFG.documentId || "").trim() && (SIIGO_CFG.devolDebit || "").trim() && (SIIGO_CFG.devolCredit || "").trim()); }
+function devolCardHTML(x, idx){
+  const posted = DEVOL_POSTED[idx];
+  const postedTxt = posted ? ("✓ Comp. " + escHtml(String(posted.number))) : "";
+  const ref = [x.factura ? ("Factura " + escHtml(x.factura)) : "", x.emisor ? ("Emisor " + escHtml(x.emisor)) : "", x.deudor ? ("Deudor " + escHtml(x.deudor)) : ""].filter(Boolean).join(" · ");
+  return '<div class="inv-card"><div class="inv-top">' +
+      '<span class="inv-name">Factura no negociada <span class="siigo-tag">Devolución</span></span>' +
+      '<span class="inv-meta">' + (ref || ("Ítem " + (idx + 1))) + ' · ' + escHtml(fmtCOP(x.valor)) + '</span>' +
+    '</div>' +
+    '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' +
+      '<label style="font-size:12px;color:var(--muted)">NIT tercero <input class="dev-nit" data-idx="' + idx + '" inputmode="numeric" placeholder="NIT (obligatorio)" value="' + escHtml(x.nit || "") + '" style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:140px;color:var(--ink);background:#fff"></label>' +
+      '<label style="font-size:12px;color:var(--muted)">Concepto <input class="dev-desc" data-idx="' + idx + '" placeholder="(opcional)" value="' + escHtml(x.concepto || "") + '" style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;width:170px;color:var(--ink);background:#fff"></label>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn" data-act="dev-reg" data-idx="' + idx + '">Registrar en Siigo</button>' +
+      '<span class="tr-state" data-tr="dev' + idx + '" style="font-size:12px;font-weight:600;align-self:center">' + postedTxt + '</span>' +
+    '</div></div>';
+}
+function renderDevolucion(){
+  const sec = $("devolSection"), list = $("devolList");
+  if(!sec || !list) return;
+  if(!reintegros.length){ sec.style.display = "none"; return; }
+  sec.style.display = "";
+  if($("devDate") && !$("devDate").value) $("devDate").value = serialToYMD(REFERENCE_SERIAL);
+  list.innerHTML = reintegros.map((x, i) => devolCardHTML(x, i)).join("");
+  list.querySelectorAll("input.dev-nit").forEach(inp => inp.addEventListener("change", () => { reintegros[Number(inp.dataset.idx)].nit = inp.value.trim(); }));
+  list.querySelectorAll("input.dev-desc").forEach(inp => inp.addEventListener("change", () => { reintegros[Number(inp.dataset.idx)].concepto = inp.value.trim(); }));
+  list.querySelectorAll('button[data-act="dev-reg"]').forEach(btn => btn.addEventListener("click", () => registerDevolucion(Number(btn.dataset.idx))));
+  const rall = $("btnRegisterAllDevol");
+  if(rall) rall.onclick = registerAllDevol;
+}
+async function registerDevolucion(idx, opts){
+  opts = opts || {};
+  const x = reintegros[idx];
+  if(!x) return false;
+  if(!(window.api && window.api.siigoCreateJournal)){ showToast("Disponible en la app instalada.", false); return false; }
+  if(!SIIGO_CREDS_OK || !(SIIGO_CFG.documentId || "").trim()){
+    showToast("Configura Siigo (credenciales + tipo de comprobante) antes de registrar.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return false;
+  }
+  if(!(SIIGO_CFG.devolDebit || "").trim() || !(SIIGO_CFG.devolCredit || "").trim()){
+    showToast("Configura las cuentas de devolución en la pantalla de Siigo.", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return false;
+  }
+  const nit = (x.nit || "").trim();
+  if(!nit){ showToast("Escribe el NIT del tercero de la devolución.", false); return false; }
+  if(!(val0(x.valor) > 0)){ showToast("El monto debe ser mayor que cero.", false); return false; }
+  const date = ($("devDate") && $("devDate").value) || serialToYMD(REFERENCE_SERIAL);
+  if(!opts.fromBulk && DEVOL_POSTED[idx]){
+    if(!window.confirm("Ya registraste esta devolución (comprobante " + DEVOL_POSTED[idx].number + ").\n\n¿Registrar OTRO comprobante?")) return false;
+  }
+  if(!opts.fromBulk){
+    const preview = "Registrar DEVOLUCIÓN de factura no negociada en Siigo:\n\n" +
+      "Monto: " + fmtCOP(x.valor) + "\nNIT tercero: " + nit + "\nFecha: " + date + "\n\n" +
+      "Débito  · cuenta " + (SIIGO_CFG.devolDebit) + "\n" +
+      "Crédito · cuenta " + (SIIGO_CFG.devolCredit) + "\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
+    if(!window.confirm(preview)) return false;
+  }
+  setTrState("dev" + idx, "Registrando…", "var(--warn)");
+  try {
+    const descD = x.concepto ? ("Devolución factura no negociada — " + x.concepto)
+      : (x.factura ? ("Devolución factura no negociada No. " + x.factura) : "Devolución factura no negociada");
+    const res = await window.api.siigoCreateJournal({
+      mode:"devolucion", date, value: val0(x.valor), nit,
+      documentId: SIIGO_CFG.documentId, description: descD,
+    });
+    if(res && res.ok){
+      DEVOL_POSTED[idx] = { number: res.number, id: res.id };
+      setTrState("dev" + idx, "✓ Comp. " + res.number, "var(--ok)");
+      log("✓ Siigo (devolución): comprobante " + res.number + " · " + fmtCOP(x.valor), "ok");
+      return true;
+    }
+    setTrState("dev" + idx, "✗ Error", "var(--err)");
+    log("✗ Siigo error devolución: " + (res && res.error), "err");
+    showToast("Error registrando devolución.", false);
+    return false;
+  } catch(err){
+    setTrState("dev" + idx, "✗ Error", "var(--err)");
+    log("✗ Siigo error devolución: " + (err && err.message || err), "err");
+    return false;
+  }
+}
+async function registerAllDevol(){
+  if(!devolReady()){
+    showToast("Configura Siigo (credenciales, tipo de comprobante y cuentas de devolución).", false);
+    showTab("panelConfig"); document.getElementById("cardSiigo").scrollIntoView({ behavior:"smooth" });
+    return;
+  }
+  const targets = [];
+  reintegros.forEach((x, i) => { if((x.nit || "").trim() && val0(x.valor) > 0) targets.push(i); });
+  if(!targets.length){ showToast("Nada por registrar: escribe el NIT de al menos una factura.", false); return; }
+  const date = ($("devDate") && $("devDate").value) || serialToYMD(REFERENCE_SERIAL);
+  const sinNit = reintegros.length - targets.length;
+  const already = targets.filter(i => DEVOL_POSTED[i]).length;
+  let msg = "Vas a registrar " + targets.length + " devolución(es) en Siigo con fecha " + date + ".";
+  if(sinNit > 0) msg += "\n" + sinNit + " sin NIT se omitirán.";
+  if(already > 0) msg += "\n⚠ " + already + " ya se registraron en esta sesión; se registrarán de nuevo.";
+  msg += "\n\nEsto ESCRIBE en tu contabilidad. ¿Continuar?";
+  if(!window.confirm(msg)) return;
+  const btn = $("btnRegisterAllDevol"); if(btn) btn.disabled = true;
+  let ok = 0, fail = 0;
+  for(const idx of targets){
+    const done = await registerDevolucion(idx, { fromBulk:true });
+    if(done) ok++; else fail++;
+    await new Promise(res => setTimeout(res, 400));
+  }
+  if(btn) btn.disabled = false;
+  showToast("Devoluciones en Siigo: " + ok + " ok" + (fail ? (", " + fail + " con error") : ""), fail === 0);
+}
+
 async function initSiigoConfig(){
   const el = id => document.getElementById(id);
   if(!el("sgUser")) return;
@@ -3499,7 +3686,7 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "" };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "" };
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
     SIIGO_CREDS_OK = !!(c.username && c.partnerId && c.hasAccessKey);
     SIIGO_READY = !!(SIIGO_CREDS_OK && cuentasOK);
@@ -3519,6 +3706,8 @@ async function initSiigoConfig(){
     if(el("sgTransferOrigin")) el("sgTransferOrigin").value = c.transferOriginAccount || "";
     if(el("sgTransferDestInv")) el("sgTransferDestInv").value = c.transferDestInv || "";
     if(el("sgTransferDestLiq")) el("sgTransferDestLiq").value = c.transferDestLiq || "";
+    if(el("sgDevolDebit")) el("sgDevolDebit").value = c.devolDebit || "";
+    if(el("sgDevolCredit")) el("sgDevolCredit").value = c.devolCredit || "";
     refreshReady(c);
   } catch(_){}
 
@@ -3534,6 +3723,8 @@ async function initSiigoConfig(){
       transferOriginAccount: el("sgTransferOrigin") ? el("sgTransferOrigin").value.trim() : "",
       transferDestInv: el("sgTransferDestInv") ? el("sgTransferDestInv").value.trim() : "",
       transferDestLiq: el("sgTransferDestLiq") ? el("sgTransferDestLiq").value.trim() : "",
+      devolDebit: el("sgDevolDebit") ? el("sgDevolDebit").value.trim() : "",
+      devolCredit: el("sgDevolCredit") ? el("sgDevolCredit").value.trim() : "",
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
     try {
@@ -3541,7 +3732,7 @@ async function initSiigoConfig(){
       el("sgKey").value = "";
       refreshReady(c);
       showToast("Configuración de Siigo guardada");
-      if(individualResults.length) renderIndividualResults();
+      renderContabilidad();
     } catch(err){ showToast("No se pudo guardar la configuración de Siigo.", false); }
   });
 
@@ -3580,6 +3771,7 @@ initSiigoConfig();
 function showTab(panelId){
   document.querySelectorAll(".nav-tab").forEach(t => t.classList.toggle("active", t.dataset.panel === panelId));
   document.querySelectorAll(".nav-panel").forEach(p => p.classList.toggle("active", p.id === panelId));
+  if(panelId === "panelSiigo" && typeof renderContabilidad === "function") renderContabilidad();
 }
 document.querySelectorAll(".nav-tab").forEach(t => {
   t.addEventListener("click", () => showTab(t.dataset.panel));
