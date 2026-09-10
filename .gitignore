@@ -15,3 +15,7 @@ renderer/__tmp_*
 *.jpeg
 logo liquitech para firma de correo.html
 logo liquitech para firma de correo_files/
+
+# Extractos bancarios reales (Bancolombia) — nunca subir
+CSV_1910000341*.csv
+CSV_*_000000*.csv

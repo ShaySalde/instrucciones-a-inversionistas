@@ -445,7 +445,7 @@
           style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
       </label>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Traslado entre cuentas (distribution amount)</b> — cuentas fijas. Es un traslado <b>encadenado</b>: <b>1)</b> todo el giro sale de la <b>cuenta origen</b> y entra a la <b>cuenta que dispersa a inversionistas</b> (Débito B / Crédito Origen); <b>2)</b> de esa cuenta sale la parte de Liquitech al <b>FIC</b> (Débito FIC / Crédito B).</p>
+    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Traslado entre cuentas (distribution amount)</b> — cuentas fijas. Son <b>2 traslados que salen de la misma cuenta origen</b>: <b>1)</b> la parte de inversionistas va a la <b>cuenta que dispersa a inversionistas</b> (Débito B / Crédito Origen); <b>2)</b> la parte de Liquitech va al <b>FIC</b> (Débito FIC / Crédito Origen).</p>
     <div class="row" style="gap:16px;align-items:flex-start">
       <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta origen (de donde sale el giro)
         <input type="text" id="sgTransferOrigin" inputmode="numeric" placeholder="p. ej. …3416" autocomplete="off"
@@ -502,7 +502,7 @@
       </div>
       <div class="op" data-op="traslado" id="opTraslado">
         <p class="op-title">🔁 Traslado entre cuentas</p>
-        <p class="op-desc">Sube el <b>payment tape</b> y el archivo de <b>montos girados (distribution amount)</b>. Genera el <b>Resumen de instrucción con conciliación</b> (giro real vs. calculado; la diferencia = facturas no negociadas) y permite <b>contabilizar en Siigo</b> el traslado <b>encadenado</b> en 2 movimientos: (1) origen → cuenta que dispersa a inversionistas por el total; (2) esa cuenta → FIC por la parte de Liquitech.</p>
+        <p class="op-desc">Sube el <b>payment tape</b> y el archivo de <b>montos girados (distribution amount)</b>. Genera el <b>Resumen de instrucción con conciliación</b> (giro real vs. calculado; la diferencia = facturas no negociadas) y permite <b>contabilizar en Siigo</b> el traslado en 2 movimientos desde la cuenta origen: (1) inversionistas → cuenta que dispersa a inversionistas; (2) Liquitech → FIC.</p>
       </div>
     </div>
   </section>
@@ -540,7 +540,7 @@
 
   <section class="card" id="trasladoSection" style="display:none">
     <h2>3 · Traslado entre cuentas · Siigo</h2>
-    <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">El traslado se contabiliza en Siigo <b>encadenado</b>, en 2 movimientos: <b>1)</b> todo el giro sale de la <b>cuenta origen</b> y entra a la <b>cuenta que dispersa a inversionistas</b> (Débito B / Crédito Origen); <b>2)</b> de esa cuenta sale la <b>parte de Liquitech al FIC</b> (Débito FIC / Crédito B). Las cuentas se configuran fijas en la pantalla de Siigo. Registra los movimientos en orden (primero A→B).</p>
+    <p style="color:var(--muted);font-size:12.5px;margin-top:-4px">El traslado se contabiliza en Siigo en 2 movimientos, ambos <b>desde la cuenta origen</b>: <b>1)</b> la parte de <b>inversionistas</b> a la <b>cuenta que dispersa a inversionistas</b> (Débito B / Crédito Origen); <b>2)</b> la parte de <b>Liquitech al FIC</b> (Débito FIC / Crédito Origen). Las cuentas se configuran fijas en la pantalla de Siigo.</p>
     <div class="row" id="trasladoTools" style="margin:10px 0 4px;gap:12px;align-items:center">
       <label style="font-size:12px;color:var(--muted)">Fecha comprobante (Siigo):
         <input type="date" id="trDate" style="margin-left:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--ink);background:#fff">
@@ -3327,28 +3327,30 @@ async function registerAll(){
 }
 
 // ============================================================================
-//  Traslado entre cuentas (encadenado) — 2 movimientos + registro en Siigo
-//    M1: Origen (A) -> cuenta que dispersa a inversionistas (B), por el TOTAL.
-//    M2: B -> FIC (Liquitech), por la parte de Liquitech.
-//  (De B también salen los pagos a inversionistas: esa es la restitución que ya existe.)
+//  Traslado entre cuentas — 2 movimientos, ambos desde la cuenta origen (A).
+//    M1: A -> cuenta que dispersa a inversionistas (B), por el TOTAL de inversionistas.
+//    M2: A -> FIC, por la parte de Liquitech.
+//  (De B se reparte luego a los inversionistas: esa es la restitución que ya existe.)
+//  Basado en el comportamiento real del banco: ambos giros salen de A; la parte
+//  de Liquitech va directo de A al FIC (no pasa por B).
 // ============================================================================
 function nitKeyDV(nit){ return String(nit == null ? "" : nit).split("-")[0].replace(/\D/g, ""); }
 function computeTrasladoMovimientos(){
   const A   = (SIIGO_CFG.transferOrigin  || "").trim();
   const B   = (SIIGO_CFG.transferDestInv || "").trim();
   const FIC = (SIIGO_CFG.transferDestLiq || "").trim();
-  let total = 0, liqTotal = 0, invBen = null, liqBen = null;
+  let invTotal = 0, liqTotal = 0, invBen = null, liqBen = null;
   for(const b of trasladoBeneficiarios){
-    const m = val0(b.monto); total += m;
+    const m = val0(b.monto);
     if(b.leg === "liq"){ liqTotal += m; if(!liqBen) liqBen = b; }
-    else if(!invBen) invBen = b;
+    else { invTotal += m; if(!invBen) invBen = b; }
   }
   const movs = [];
   movs.push({
     id:"m1", titulo:"1 · Traslado a la cuenta que dispersa a inversionistas",
     debito:B,  debitoLbl:"cuenta que dispersa a inversionistas",
     credito:A, creditoLbl:"cuenta origen",
-    valor: total,
+    valor: invTotal,
     nit: (invBen && invBen.nit) || (liqBen && liqBen.nit) || "",
     name: (invBen && invBen.name) || "",
     description: "Traslado entre cuentas a cuenta pago a fondeadores"
@@ -3357,7 +3359,7 @@ function computeTrasladoMovimientos(){
     movs.push({
       id:"m2", titulo:"2 · Traslado al FIC (parte de Liquitech)",
       debito:FIC, debitoLbl:"cuenta FIC",
-      credito:B,  creditoLbl:"cuenta que dispersa a inversionistas",
+      credito:A,  creditoLbl:"cuenta origen",
       valor: liqTotal,
       nit: (liqBen && liqBen.nit) || "",
       name: (liqBen && liqBen.name) || "",
@@ -3473,7 +3475,7 @@ async function registerAllTraslado(){
   if(!movs.length){ showToast("Nada por registrar: configura las cuentas del traslado en la pantalla de Siigo.", false); return; }
   const date = ($("trDate") && $("trDate").value) || serialToYMD(REFERENCE_SERIAL);
   const already = movs.filter(m => TRANSFER_POSTED[m.id]).length;
-  let msg = "Vas a registrar " + movs.length + " movimiento(s) de traslado en Siigo con fecha " + date + " (en orden: A→B y luego B→FIC).";
+  let msg = "Vas a registrar " + movs.length + " movimiento(s) de traslado en Siigo con fecha " + date + " (ambos salen de la cuenta origen).";
   if(already > 0) msg += "\n⚠ " + already + " ya se registraron en esta sesión; se registrarán de nuevo.";
   msg += "\n\nEsto ESCRIBE en tu contabilidad. ¿Continuar?";
   if(!window.confirm(msg)) return;
