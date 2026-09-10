@@ -7,6 +7,7 @@ dist/
 Ejemplo registros de instrucciones a Inversionistas.xlsx
 payment_tape*.csv
 payment_tape*.xlsx
+distribution_amount*.csv
 *_Distribuido.xlsx
 renderer/__tmp_*
 # Capturas/imágenes con datos reales (listados de inversionistas, etc.)
