@@ -1852,7 +1852,10 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
   let totalInversionistas = 0;
   for(const v of invGroups.values()) totalInversionistas += v;
   for(const v of fuenteGroups.values()) totalInversionistas += v;
-  const liquitech = totalRecibido - totalInversionistas;
+  // Las facturas no negociadas (reintegros) se devuelven al tercero: NO son parte de Liquitech.
+  // Se excluyen de Liquitech en el origen; así el margen (que sale de Liquitech) tampoco las toma.
+  const sumReint = reintegroItems.reduce((s, v) => s + v.valor, 0);
+  const liquitech = totalRecibido - totalInversionistas - sumReint;
   const margen = liquitech - capitalLiquitech - saldosAFavor;
 
   // Conciliación con el archivo de montos girados (distribution amount).
@@ -1869,10 +1872,12 @@ function buildResumenSheet(dat, targets, fecha, distAmounts){
   }
   const giroTotal = giroInv + giroLiq;
   const calcTotal = totalInversionistas + liquitech;
-  const diffInv = totalInversionistas - giroInv;
-  const diffLiq = liquitech - giroLiq;
-  const diffTotal = calcTotal - giroTotal;
-  const sumReint = reintegroItems.reduce((s, v) => s + v.valor, 0);
+  // Diferencia = giro real (archivo) − calculado. El archivo también mueve las no negociadas
+  // (que luego se devuelven) y el calculado ya no las incluye ⇒ la diferencia es exactamente
+  // el valor de las facturas no negociadas.
+  const diffInv = giroInv - totalInversionistas;
+  const diffLiq = giroLiq - liquitech;
+  const diffTotal = giroTotal - calcTotal;
   reintegros = reintegroItems;   // expone las no negociadas para la pestaña Contabilidad (devolución)
 
   const cmp = (a, b) => a.localeCompare(b, "es", { sensitivity: "base" });
