@@ -195,6 +195,20 @@
   .status-pill.warn{background:#fff4da;color:#8a5b00;border-color:#f2e0b0}
   .status-pill.err{background:#ffe6e6;color:#a02b2b;border-color:#f3c9c9}
 
+  /* Paneles de configuración (agrupan campos relacionados) */
+  .cfg-group{border:1px solid var(--hairline);border-radius:var(--radius-sm);
+    padding:14px 16px 16px;margin-top:14px;background:#fbfbfe}
+  .cfg-group > .cfg-head{display:flex;align-items:center;gap:9px;margin:0 0 3px}
+  .cfg-num{flex:none;width:22px;height:22px;border-radius:7px;display:inline-flex;
+    align-items:center;justify-content:center;font-size:12px;font-weight:700;
+    color:#fff;background:var(--grad-brand)}
+  .cfg-head h3{margin:0;font-size:13.5px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+  .cfg-desc{margin:0 0 10px 31px;color:var(--muted);font-size:12px;line-height:1.5}
+  .cfg-field{flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)}
+  .cfg-field > input{display:block;width:100%;margin-top:4px;padding:9px 11px;
+    border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff}
+  .cfg-hint{display:block;margin-top:5px;font-size:11px;color:var(--muted);line-height:1.45}
+
   footer{margin-top:30px;padding-top:20px;border-top:1px solid var(--hairline);
     color:var(--muted);font-size:12px;text-align:center;letter-spacing:.01em}
   footer b{color:var(--accent);font-weight:600}
@@ -407,71 +421,87 @@
       conectarse con Siigo. Cada comprobante lleva <b>2 líneas</b>: el <b>débito</b> con la cuenta de cada inversionista
       (se configura en el <b>directorio</b>) y su NIT; y el <b>crédito</b> con una cuenta y un tercero <b>fijos</b> (aquí abajo).
     </p>
-    <div class="row" style="gap:16px;align-items:flex-start">
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Usuario API
-        <input type="text" id="sgUser" placeholder="usuario@empresa" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Access Key
-        <input type="password" id="sgKey" placeholder="••••••••••••" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Partner-Id
-        <input type="text" id="sgPartner" placeholder="tu-partner-id" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-    </div>
-    <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Tipo de comprobante (ID)
-        <input type="text" id="sgDocId" inputmode="numeric" placeholder="p. ej. 25640" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-        <select id="sgDocSelect" style="display:none;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff"></select>
-      </label>
-      <div style="flex:1;min-width:200px;display:flex;align-items:flex-end">
-        <button class="btn" id="sgLoadTypes" style="margin-top:18px">📋 Cargar tipos desde Siigo</button>
+    <div class="cfg-group">
+      <div class="cfg-head"><span class="cfg-num">🔌</span><h3>Conexión con Siigo</h3></div>
+      <p class="cfg-desc">Con estos <b>3 datos</b> ya puedes usar <b>Probar conexión</b>. La <b>access key</b> se guarda cifrada en este equipo.</p>
+      <div class="row" style="gap:16px;align-items:flex-start">
+        <label class="cfg-field">Usuario API
+          <input type="text" id="sgUser" placeholder="usuario@empresa" autocomplete="off">
+        </label>
+        <label class="cfg-field">Access Key
+          <input type="password" id="sgKey" placeholder="••••••••••••" autocomplete="off">
+        </label>
+        <label class="cfg-field">Partner-Id
+          <input type="text" id="sgPartner" placeholder="tu-partner-id" autocomplete="off">
+        </label>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
+        <label class="cfg-field">Tipo de comprobante (ID)
+          <input type="text" id="sgDocId" inputmode="numeric" placeholder="p. ej. 25640" autocomplete="off">
+          <select id="sgDocSelect" style="display:none;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff"></select>
+          <span class="cfg-hint">Comprobante contable donde se registran los movimientos.</span>
+        </label>
+        <div style="flex:1;min-width:200px;display:flex;align-items:flex-start">
+          <button class="btn" id="sgLoadTypes" style="margin-top:16px">📋 Cargar tipos desde Siigo</button>
+        </div>
       </div>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Línea de crédito fija</b> — igual para todos los inversionistas:</p>
-    <div class="row" style="gap:16px;align-items:flex-start">
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta crédito (fija)
-        <input type="text" id="sgCreditAcct" inputmode="numeric" placeholder="p. ej. 11200507" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Tercero de la línea crédito (NIT, sin DV)
-        <input type="text" id="sgCreditNit" inputmode="numeric" placeholder="p. ej. 890903938" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta débito · abonos a crédito (banco)
-        <input type="text" id="sgBankDebit" inputmode="numeric" placeholder="p. ej. 21052504" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
+    <div style="display:flex;gap:8px;align-items:flex-start;margin:16px 0 2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:#f4f2fe">
+      <span style="font-size:14px;line-height:1.2">💡</span>
+      <p style="margin:0;font-size:12px;color:var(--ink);line-height:1.5">En todos los campos de abajo va el <b>código contable (PUC)</b> de la cuenta —no el número de la cuenta bancaria—. <b>No hacen falta para probar la conexión</b>; solo se usan al registrar comprobantes en la pestaña <b>🧾 Contabilidad</b>.</p>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Traslado entre cuentas (distribution amount)</b> — cuentas fijas. Son <b>2 traslados que salen de la misma cuenta origen</b>: <b>1)</b> la parte de inversionistas va a la <b>cuenta que dispersa a inversionistas</b> (Débito B / Crédito Origen); <b>2)</b> la parte de Liquitech va al <b>FIC</b> (Débito FIC / Crédito Origen).</p>
-    <div class="row" style="gap:16px;align-items:flex-start">
-      <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta origen (de donde sale el giro)
-        <input type="text" id="sgTransferOrigin" inputmode="numeric" placeholder="p. ej. …3416" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-      <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta que dispersa a inversionistas (B)
-        <input type="text" id="sgTransferDestInv" inputmode="numeric" placeholder="p. ej. …3417" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-        <span style="display:block;margin-top:4px;font-size:11px;color:var(--muted)">Debe ser la <b>misma cuenta que la “Cuenta crédito (fija)”</b> de arriba, para que esta cuenta quede en cero (el traslado la debita y la restitución/abono la acreditan).</span>
-      </label>
-      <label style="flex:1;min-width:180px;display:block;font-size:12px;color:var(--muted)">Cuenta FIC (parte de Liquitech)
-        <input type="text" id="sgTransferDestLiq" inputmode="numeric" placeholder="p. ej. cuenta del FIC" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
+
+    <div class="cfg-group">
+      <div class="cfg-head"><span class="cfg-num">1</span><h3>Restitución a inversionistas y abono a crédito (banco)</h3></div>
+      <p class="cfg-desc">Comprobante por inversionista: <b>débito</b> con la cuenta de cada inversionista (se configura en el <b>directorio</b>) y <b>crédito</b> con esta cuenta y tercero fijos. Para fuentes tipo <b>BANCO DE OCCIDENTE</b> se usa además la cuenta de la obligación.</p>
+      <div class="row" style="gap:16px;align-items:flex-start">
+        <label class="cfg-field">Cuenta crédito (fija)
+          <input type="text" id="sgCreditAcct" inputmode="numeric" placeholder="p. ej. 11200507" autocomplete="off">
+          <span class="cfg-hint">Se acredita en cada restitución. Es la cuenta que dispersa a inversionistas (…3417).</span>
+        </label>
+        <label class="cfg-field">Tercero de la línea crédito (NIT, sin DV)
+          <input type="text" id="sgCreditNit" inputmode="numeric" placeholder="p. ej. 890903938" autocomplete="off">
+          <span class="cfg-hint">NIT del tercero de esa cuenta, sin dígito de verificación.</span>
+        </label>
+        <label class="cfg-field">Cuenta débito · abonos a crédito (banco)
+          <input type="text" id="sgBankDebit" inputmode="numeric" placeholder="p. ej. 21052504" autocomplete="off">
+          <span class="cfg-hint">Cuenta de la obligación del banco. Solo para fuentes de fondeo (BANCO DE OCCIDENTE).</span>
+        </label>
+      </div>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin:14px 0 4px"><b>Devolución de facturas no negociadas</b> — cuentas fijas. Cada factura no negociada genera un comprobante (Débito / Crédito) con el <b>NIT del tercero que escribes a mano</b> en la pestaña Contabilidad.</p>
-    <div class="row" style="gap:16px;align-items:flex-start">
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta débito · devolución
-        <input type="text" id="sgDevolDebit" inputmode="numeric" placeholder="código contable" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
-      <label style="flex:1;min-width:200px;display:block;font-size:12px;color:var(--muted)">Cuenta crédito · devolución
-        <input type="text" id="sgDevolCredit" inputmode="numeric" placeholder="código contable" autocomplete="off"
-          style="display:block;width:100%;margin-top:4px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;color:var(--ink);background:#fff">
-      </label>
+
+    <div class="cfg-group">
+      <div class="cfg-head"><span class="cfg-num">2</span><h3>Traslado entre cuentas (distribution amount)</h3></div>
+      <p class="cfg-desc">Son <b>2 traslados que salen de la misma cuenta origen</b>: la parte de inversionistas va a la <b>cuenta que dispersa</b> (Débito B / Crédito Origen); la parte de Liquitech va al <b>FIC</b> (Débito FIC / Crédito Origen).</p>
+      <div class="row" style="gap:16px;align-items:flex-start">
+        <label class="cfg-field">Cuenta origen (de donde sale el giro)
+          <input type="text" id="sgTransferOrigin" inputmode="numeric" placeholder="código contable" autocomplete="off">
+          <span class="cfg-hint">Cuenta desde la que salen ambos giros (la …3416).</span>
+        </label>
+        <label class="cfg-field">Cuenta que dispersa a inversionistas (B)
+          <input type="text" id="sgTransferDestInv" inputmode="numeric" placeholder="p. ej. 11200507" autocomplete="off">
+          <span class="cfg-hint"><b>Debe ser la misma que la “Cuenta crédito (fija)”</b> del bloque 1, para que esta cuenta quede en cero (el traslado la debita y la restitución la acredita).</span>
+        </label>
+        <label class="cfg-field">Cuenta FIC (parte de Liquitech)
+          <input type="text" id="sgTransferDestLiq" inputmode="numeric" placeholder="código contable del FIC" autocomplete="off">
+          <span class="cfg-hint">Cuenta del FIC a la que va la parte de Liquitech.</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="cfg-group">
+      <div class="cfg-head"><span class="cfg-num">3</span><h3>Devolución de facturas no negociadas</h3></div>
+      <p class="cfg-desc">Cada factura no negociada genera un comprobante (Débito / Crédito) con el <b>NIT del tercero que escribes a mano</b> en la pestaña Contabilidad.</p>
+      <div class="row" style="gap:16px;align-items:flex-start">
+        <label class="cfg-field">Cuenta débito · devolución
+          <input type="text" id="sgDevolDebit" inputmode="numeric" placeholder="código contable" autocomplete="off">
+          <span class="cfg-hint">Cuenta contra la que se carga la factura devuelta.</span>
+        </label>
+        <label class="cfg-field">Cuenta crédito · devolución
+          <input type="text" id="sgDevolCredit" inputmode="numeric" placeholder="código contable" autocomplete="off">
+          <span class="cfg-hint">Contrapartida del crédito.</span>
+        </label>
+      </div>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn primary" id="sgSave">💾 Guardar</button>
@@ -3757,8 +3787,9 @@ async function initSiigoConfig(){
         sel.onchange = () => { if(sel.value) el("sgDocId").value = sel.value; };
         showToast(res.types.length + " tipo(s) cargado(s) — elige uno");
       } else {
+        const detalle = (res && res.error) ? (" — " + res.error) : "";
         log("No se pudieron cargar tipos de comprobante: " + (res && res.error), "warn");
-        showToast("No se pudieron cargar tipos; escribe el ID a mano.", false);
+        showToast("No se pudieron cargar tipos" + detalle + ". Puedes escribir el ID a mano.", false);
       }
     } catch(err){ showToast("Error consultando tipos.", false); }
   });

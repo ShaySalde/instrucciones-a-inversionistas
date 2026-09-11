@@ -489,7 +489,8 @@ ipcMain.handle("siigo:verify", async () => {
 });
 ipcMain.handle("siigo:getDocumentTypes", async () => {
   try {
-    const r = await siigoFetch("/v1/document-types?type=Journal");
+    // En Siigo el tipo de los comprobantes contables (notas de contabilidad / journals) es "CC".
+    const r = await siigoFetch("/v1/document-types?type=CC");
     if (!r.ok) return { ok: false, error: siigoErr(r) };
     const list = Array.isArray(r.data) ? r.data : (r.data.results || []);
     return { ok: true, types: list.map(t => ({ id: t.id, code: t.code, name: t.name })) };
