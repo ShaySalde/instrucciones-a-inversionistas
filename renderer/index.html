@@ -486,6 +486,10 @@
           <input type="text" id="sgTransferDestLiq" inputmode="numeric" placeholder="código contable del FIC" autocomplete="off">
           <span class="cfg-hint">Cuenta del FIC a la que va la parte de Liquitech.</span>
         </label>
+        <label class="cfg-field">Tercero (NIT) · cuenta FIC
+          <input type="text" id="sgTransferDestLiqNit" inputmode="numeric" placeholder="NIT del FIC (sin DV)" autocomplete="off">
+          <span class="cfg-hint">NIT propio del FIC (línea <b>débito</b> del traslado al FIC). La línea crédito (origen 3416) usa el <b>“Tercero crédito fija”</b> del bloque 1. Si lo dejas vacío, se usa el NIT del archivo.</span>
+        </label>
       </div>
     </div>
 
@@ -2295,7 +2299,6 @@ async function runIndividual(){
   const iFuente    = DIST_TARGETS.indexOf("Nombre fuente de fondeo");
   const iNitFuente = DIST_TARGETS.indexOf("NIT fuente de fondeo");
   const iNoOp      = DIST_TARGETS.indexOf("No Operación");
-  const iVP        = DIST_TARGETS.indexOf("Valor a pagar");
   const iNitInv    = INDIV_COLS.indexOf("NIT inversionista"); // índice dentro de `filtered`
 
   // Partición: fuente de fondeo vacía = restitución al inversionista; con valor = abono a crédito (banco)
@@ -2352,7 +2355,8 @@ async function runIndividual(){
     let total = 0;
     for(const r of rows){
       const noOp = iNoOp >= 0 ? String(r[iNoOp] ?? "").trim() : "";
-      const vp = iVP >= 0 ? val0(r[iVP]) : 0;
+      // Abono a crédito (banco): usa "Total para inversionista" (mismo valor que la restitución), no "Valor a pagar".
+      const vp = iTot >= 0 ? val0(r[iTot]) : 0;
       const key = noOp || "(sin operación)";
       if(!opMap.has(key)) opMap.set(key, { noOp: key, valor: 0 });
       opMap.get(key).valor += vp;
@@ -2495,7 +2499,7 @@ function bankOpsHTML(r, idx){
       '</div>';
   }).join("");
   return '<div class="bank-ops">' +
-      '<div class="bank-op-row bank-op-head"><span class="bo-op">Operación</span><span class="bo-val">Valor a pagar</span><span class="bo-oblig-h">N° de obligación</span></div>' +
+      '<div class="bank-op-row bank-op-head"><span class="bo-op">Operación</span><span class="bo-val">Valor a trasladar</span><span class="bo-oblig-h">N° de obligación</span></div>' +
       rows +
     '</div>';
 }
@@ -3176,7 +3180,7 @@ initMailConfig();
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante + línea de crédito listos
 let SIIGO_CREDS_OK = false;            // solo credenciales (usuario + partner + access key)
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", devolDebit: "", devolCredit: "" };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", transferDestLiqNit: "", devolDebit: "", devolCredit: "" };
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
 const TRANSFER_POSTED = {};            // nit -> { number, id } traslados ya registrados en esta sesión
@@ -3190,20 +3194,21 @@ async function loadSiigoAccounts(){
   try { SIIGO_ACCOUNTS = JSON.parse(localStorage.getItem(SIIGO_ACC_KEY) || "{}"); }
   catch(_){ SIIGO_ACCOUNTS = {}; }
 }
-async function saveSiigoAccount(name, nit, debit, credit){
+async function saveSiigoAccount(name, nit, debit, credit, debitNit){
   const nm = String(name || "").trim(), nt = String(nit || "").trim();
   if(!nm && !nt) return;
   if(window.api && window.api.siigoSetAccount){
-    try { SIIGO_ACCOUNTS = (await window.api.siigoSetAccount({ name:nm, nit:nt, debit, credit })) || SIIGO_ACCOUNTS; return; } catch(_){}
+    try { SIIGO_ACCOUNTS = (await window.api.siigoSetAccount({ name:nm, nit:nt, debit, credit, debitNit })) || SIIGO_ACCOUNTS; return; } catch(_){}
   }
   const id = invId(nm, nt);
   const d = debit != null ? String(debit).trim() : "";
   const c = credit != null ? String(credit).trim() : "";
-  if(d || c) SIIGO_ACCOUNTS[id] = { name:nm, nit:nt, debit:d, credit:c }; else delete SIIGO_ACCOUNTS[id];
+  const dn = debitNit != null ? String(debitNit).replace(/\D/g, "") : "";
+  if(d || c || dn) SIIGO_ACCOUNTS[id] = { name:nm, nit:nt, debit:d, credit:c, debitNit:dn }; else delete SIIGO_ACCOUNTS[id];
   try { localStorage.setItem(SIIGO_ACC_KEY, JSON.stringify(SIIGO_ACCOUNTS)); } catch(_){}
 }
-async function deleteSiigoAccount(name, nit){ await saveSiigoAccount(name, nit, "", ""); }
-function siigoAccFor(name, nit){ const e = SIIGO_ACCOUNTS[ invId(name, nit) ] || {}; return { debit: e.debit || "", credit: e.credit || "" }; }
+async function deleteSiigoAccount(name, nit){ await saveSiigoAccount(name, nit, "", "", ""); }
+function siigoAccFor(name, nit){ const e = SIIGO_ACCOUNTS[ invId(name, nit) ] || {}; return { debit: e.debit || "", credit: e.credit || "", debitNit: e.debitNit || "" }; }
 
 function siigoCardHTML(r, idx){
   if(!SIIGO_READY) return '';
@@ -3224,8 +3229,9 @@ function siigoCardHTML(r, idx){
 
   const acc = siigoAccFor(r.name, r.nit);
   const debit = (acc.debit || "").trim();
+  const dnOverride = (acc.debitNit || "").trim();
   const accHtml = debit
-    ? '<span class="ro-acct">Débito <b>' + escHtml(debit) + '</b> · Crédito <b>' + escHtml(credit || "—") + '</b> (fija)</span>'
+    ? '<span class="ro-acct">Débito <b>' + escHtml(debit) + '</b>' + (dnOverride ? ' · tercero <b>' + escHtml(dnOverride) + '</b>' : '') + ' · Crédito <b>' + escHtml(credit || "—") + '</b> (fija)</span>'
     : '<span class="ro-missing">Sin cuenta débito</span>';
   return '<div class="inv-siigo"><span class="siigo-tag">🧾 Siigo</span>' + accHtml +
       '<button class="linklike" data-act="cfg-siigo" data-idx="' + idx + '">⚙ ' + (debit ? 'Editar' : 'Configurar') + '</button>' +
@@ -3308,6 +3314,7 @@ async function registerOne(idx, opts){
   if(r.kind === "bank") return await registerBank(idx, r, opts);
   const acc = siigoAccFor(r.name, r.nit);
   const debit = (acc.debit || "").trim();
+  const debitNit = (acc.debitNit || r.nit || "").trim();  // tercero línea débito: override o NIT del inversionista
   const creditAccount = (SIIGO_CFG.creditAccount || "").trim();
   const creditNit = (SIIGO_CFG.creditNit || "").trim();
   if(!debit){
@@ -3330,14 +3337,14 @@ async function registerOne(idx, opts){
   if(!opts.fromBulk){
     const preview = "Registrar comprobante en Siigo:\n\n" +
       "Inversionista: " + r.name + "\nNIT: " + (r.nit || "—") + "\nFecha: " + date + "\nMonto: " + fmtCOP(r.total) + "\n\n" +
-      "Débito  · cuenta " + debit + " · tercero " + (r.nit || "—") + "\n" +
+      "Débito  · cuenta " + debit + " · tercero " + (debitNit || "—") + "\n" +
       "Crédito · cuenta " + creditAccount + " · tercero " + creditNit + "\n\nEsto escribe en tu contabilidad. ¿Confirmar?";
     if(!window.confirm(preview)) return false;
   }
   setSgState(idx, "Registrando…", "var(--warn)");
   try {
     const res = await window.api.siigoCreateJournal({
-      date, value: r.total, nit: r.nit, name: r.name,
+      date, value: r.total, nit: r.nit, debitNit, name: r.name,
       debit, creditAccount, creditNit, documentId: SIIGO_CFG.documentId,
     });
     if(res && res.ok){
@@ -3417,23 +3424,32 @@ function computeTrasladoMovimientos(){
     if(b.leg === "liq"){ liqTotal += m; if(!liqBen) liqBen = b; }
     else { invTotal += m; if(!invBen) invBen = b; }
   }
+  // Terceros FIJOS por cuenta (según el plano contable real, no del archivo):
+  //   3416 (origen) y 3417 (dispersa) → tercero de Liquitech (= "Tercero crédito fija", 890903938)
+  //   FIC → su tercero propio (transferDestLiqNit, 800194363)
+  // nit = tercero de la línea crédito (origen). debitoNit = tercero de la línea débito (destino).
+  const liqNit = (SIIGO_CFG.creditNit || "").trim() || (invBen && invBen.nit) || "";
+  const ficNit = (SIIGO_CFG.transferDestLiqNit || "").trim() || (liqBen && liqBen.nit) || "";
   const movs = [];
-  movs.push({
-    id:"m1", titulo:"1 · Traslado a la cuenta que dispersa a inversionistas",
-    debito:B,  debitoLbl:"cuenta que dispersa a inversionistas",
-    credito:A, creditoLbl:"cuenta origen",
-    valor: invTotal,
-    nit: (invBen && invBen.nit) || (liqBen && liqBen.nit) || "",
-    name: (invBen && invBen.name) || "",
-    description: "Traslado entre cuentas a cuenta pago a fondeadores"
-  });
+  {
+    movs.push({
+      id:"m1", titulo:"1 · Traslado a la cuenta que dispersa a inversionistas",
+      debito:B,  debitoLbl:"cuenta que dispersa a inversionistas",
+      credito:A, creditoLbl:"cuenta origen",
+      valor: invTotal,
+      nit: liqNit, debitoNit: liqNit,   // ambas líneas: tercero Liquitech (890903938)
+      name: (invBen && invBen.name) || "",
+      description: "Traslado entre cuentas a cuenta pago a fondeadores"
+    });
+  }
   if(liqTotal > 0){
     movs.push({
       id:"m2", titulo:"2 · Traslado al FIC (parte de Liquitech)",
       debito:FIC, debitoLbl:"cuenta FIC",
       credito:A,  creditoLbl:"cuenta origen",
       valor: liqTotal,
-      nit: (liqBen && liqBen.nit) || "",
+      nit: liqNit,        // línea crédito (origen 3416): tercero Liquitech (890903938)
+      debitoNit: ficNit,  // línea débito (FIC): tercero propio del FIC (800194363)
       name: (liqBen && liqBen.name) || "",
       description: "Traslado al FIC " + ((liqBen && liqBen.name) || "Liquitech")
     });
@@ -3509,16 +3525,15 @@ async function registerMovimiento(movId, opts){
   if(!opts.fromBulk){
     const preview = "Registrar TRASLADO ENTRE CUENTAS en Siigo:\n\n" +
       mov.titulo + "\nFecha: " + date + "\nMonto: " + fmtCOP(mov.valor) + "\n\n" +
-      "Débito  · cuenta " + mov.debito + " (" + mov.debitoLbl + ")\n" +
-      "Crédito · cuenta " + mov.credito + " (" + mov.creditoLbl + ")\n" +
-      (mov.nit ? ("Tercero · NIT " + mov.nit + "\n") : "") +
+      "Débito  · cuenta " + mov.debito + " (" + mov.debitoLbl + ")" + (mov.debitoNit ? (" · NIT " + mov.debitoNit) : "") + "\n" +
+      "Crédito · cuenta " + mov.credito + " (" + mov.creditoLbl + ")" + (mov.nit ? (" · NIT " + mov.nit) : "") + "\n" +
       "\nEsto escribe en tu contabilidad. ¿Confirmar?";
     if(!window.confirm(preview)) return false;
   }
   setTrState(mov.id, "Registrando…", "var(--warn)");
   try {
     const res = await window.api.siigoCreateJournal({
-      mode:"transfer", date, value: val0(mov.valor), nit: mov.nit, name: mov.name,
+      mode:"transfer", date, value: val0(mov.valor), nit: mov.nit, debitNit: mov.debitoNit, name: mov.name,
       destAccount: mov.debito, originAccount: mov.credito, description: mov.description,
       documentId: SIIGO_CFG.documentId,
     });
@@ -3721,7 +3736,7 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "" };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", transferDestLiqNit: c.transferDestLiqNit || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "" };
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
     SIIGO_CREDS_OK = !!(c.username && c.partnerId && c.hasAccessKey);
     SIIGO_READY = !!(SIIGO_CREDS_OK && cuentasOK);
@@ -3741,6 +3756,7 @@ async function initSiigoConfig(){
     if(el("sgTransferOrigin")) el("sgTransferOrigin").value = c.transferOriginAccount || "";
     if(el("sgTransferDestInv")) el("sgTransferDestInv").value = c.transferDestInv || "";
     if(el("sgTransferDestLiq")) el("sgTransferDestLiq").value = c.transferDestLiq || "";
+    if(el("sgTransferDestLiqNit")) el("sgTransferDestLiqNit").value = c.transferDestLiqNit || "";
     if(el("sgDevolDebit")) el("sgDevolDebit").value = c.devolDebit || "";
     if(el("sgDevolCredit")) el("sgDevolCredit").value = c.devolCredit || "";
     refreshReady(c);
@@ -3758,6 +3774,7 @@ async function initSiigoConfig(){
       transferOriginAccount: el("sgTransferOrigin") ? el("sgTransferOrigin").value.trim() : "",
       transferDestInv: el("sgTransferDestInv") ? el("sgTransferDestInv").value.trim() : "",
       transferDestLiq: el("sgTransferDestLiq") ? el("sgTransferDestLiq").value.trim() : "",
+      transferDestLiqNit: el("sgTransferDestLiqNit") ? el("sgTransferDestLiqNit").value.trim() : "",
       devolDebit: el("sgDevolDebit") ? el("sgDevolDebit").value.trim() : "",
       devolCredit: el("sgDevolCredit") ? el("sgDevolCredit").value.trim() : "",
     };
@@ -3828,7 +3845,7 @@ function dirRowsData(){
     let name = de ? de.name : (se.name || "");
     let nit  = de ? de.nit  : (se.nit  || "");
     if(!name && !nit){ const sp = splitId(id); name = sp.name; nit = sp.nit; }
-    return { name: name || "", nit: nit || "", emails: de ? de.emails.slice() : [], debit: se.debit || "", credit: se.credit || "" };
+    return { name: name || "", nit: nit || "", emails: de ? de.emails.slice() : [], debit: se.debit || "", credit: se.credit || "", debitNit: se.debitNit || "" };
   });
   rows.sort((a, b) =>
     (a.name || "").localeCompare(b.name || "", "es", { sensitivity:"base" }) ||
@@ -3869,8 +3886,10 @@ function dirItemHTML(row, isNew){
           '<div class="dir-accts" style="margin-top:12px">' +
             '<label class="dir-field" style="flex:1">Cuenta débito · Siigo (la de este inversionista)' +
               '<input class="dir-debit" inputmode="numeric" placeholder="p. ej. 28159001" value="' + escHtml(row.debit || "") + '"></label>' +
+            '<label class="dir-field" style="flex:1">NIT débito (opcional)' +
+              '<input class="dir-debit-nit" inputmode="numeric" placeholder="por defecto: el NIT del inversionista" value="' + escHtml(row.debitNit || "") + '"></label>' +
           '</div>' +
-          '<p style="color:var(--muted);font-size:11px;margin:7px 0 0">La cuenta <b>crédito</b> es fija para todos y se configura arriba, en <b>Contabilidad · Siigo</b>.</p>' +
+          '<p style="color:var(--muted);font-size:11px;margin:7px 0 0">La cuenta <b>crédito</b> es fija para todos y se configura arriba, en <b>Contabilidad · Siigo</b>. El <b>NIT débito</b> solo se llena cuando el tercero de la línea débito debe ser distinto al NIT del inversionista.</p>' +
         '</div>' +
       '</div>' +
       '<div class="dir-actions">' +
@@ -3938,6 +3957,8 @@ async function saveDirItem(item){
   const name = (item.querySelector('.dir-name').value || "").trim();
   const nit = (item.querySelector('.dir-nit').value || "").trim();
   const debit = (item.querySelector('.dir-debit').value || "").trim();
+  const dnEl = item.querySelector('.dir-debit-nit');
+  const debitNit = (dnEl && dnEl.value ? dnEl.value : "").trim();
   const emails = readRowEmails(item);
   // Incluir un correo escrito pero no agregado con "+"
   const pending = (item.querySelector('.add-email-input').value || "").trim();
@@ -3948,7 +3969,7 @@ async function saveDirItem(item){
   if(!name){ showToast("Escribe el nombre del inversionista.", false); item.querySelector('.dir-name').focus(); return; }
 
   await saveDirectoryEntry(name, nit, { emails });
-  await saveSiigoAccount(name, nit, debit);
+  await saveSiigoAccount(name, nit, debit, undefined, debitNit);
   showToast("Inversionista guardado: " + (name || nit));
   renderDirectory();
   if(individualResults.length) renderIndividualResults();

@@ -19,3 +19,6 @@ logo liquitech para firma de correo_files/
 # Extractos bancarios reales (Bancolombia) — nunca subir
 CSV_1910000341*.csv
 CSV_*_000000*.csv
+
+# Planos contables de traslados (NITs/montos reales) — nunca subir
+Plano_Traslados*.xlsx
