@@ -308,7 +308,8 @@ function getSiigoConfigPublic() {
     transferDestLiq: s.siigoTransferDestLiq || "",             // cuenta destino fija · línea Liquitech (FIC)
     transferDestLiqNit: s.siigoTransferDestLiqNit || "",       // tercero propio de la cuenta FIC (línea débito del traslado al FIC)
     devolDebit: s.siigoDevolDebit || "",                       // cuenta débito · devolución de facturas no negociadas
-    devolCredit: s.siigoDevolCredit || "",                     // cuenta crédito · devolución de facturas no negociadas
+    devolCredit: s.siigoDevolCredit || "",                     // (legado) crédito fijo de devolución; hoy se usa el banco elegido
+    banks: Array.isArray(s.siigoBanks) ? s.siigoBanks : [],    // bancos [{name, account}] para el crédito de devolución
   };
 }
 // NIT sin dígito de verificación (900.123.456-1 -> 900123456)
@@ -323,7 +324,7 @@ function getSiigoAccessKey() {
   }
   return s.siigoAccessKeyPlain || "";
 }
-function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq, transferDestLiqNit, devolDebit, devolCredit }) {
+function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq, transferDestLiqNit, devolDebit, devolCredit, banks }) {
   const s = loadSettingsRaw();
   s.siigoPartnerId = (partnerId || "").trim();
   s.siigoUsername = (username || "").trim();
@@ -337,6 +338,12 @@ function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAcc
   if (transferDestLiqNit !== undefined) s.siigoTransferDestLiqNit = nitNoDV(transferDestLiqNit);
   if (devolDebit !== undefined) s.siigoDevolDebit = String(devolDebit || "").trim();
   if (devolCredit !== undefined) s.siigoDevolCredit = String(devolCredit || "").trim();
+  if (banks !== undefined) {
+    // Normaliza la lista de bancos: {name, account} con ambos no vacíos.
+    s.siigoBanks = (Array.isArray(banks) ? banks : [])
+      .map(b => ({ name: String((b && b.name) || "").trim(), account: String((b && b.account) || "").trim() }))
+      .filter(b => b.name || b.account);
+  }
   if (typeof accessKey === "string" && accessKey.trim().length) {
     const k = accessKey.trim();
     delete s.siigoAccessKeyPlain;
