@@ -1739,7 +1739,8 @@ function buildInstruccionRows(dat, iInvName, iFuente, iTot){
 }
 
 // Lee la hoja fuente del payment tape y devuelve la matriz `dat` mapeada a las 69 columnas canónicas (DIST_TARGETS)
-function parsePaymentTape(wb){
+function parsePaymentTape(wb, opts){
+  opts = opts || {};
   const src = findSourceSheet(wb);
   if(!src) throw new Error("No encontré la hoja del payment tape. Debe tener 'inversionista_beneficiario' u 'owner_name' en la fila 1.");
   log("• Hoja fuente: \"" + src.name + "\"");
@@ -1787,11 +1788,13 @@ function parsePaymentTape(wb){
 
   const dat = dataRows.map(row => colOf.map(c => c >= 0 ? row[c] : null));
 
-  // Recalcular "Fecha de liquidación" = Fecha de compraventa + Días de liquidación (días calendario)
+  // Recalcular "Fecha de liquidación" = Fecha de compraventa + Días de liquidación (días calendario).
+  // Solo para el reporte por inversionista (opts.recalcFechaLiq); el entregable de "Distribuir"
+  // conserva la fecha original del payment tape.
   const iCompra = DIST_TARGETS.indexOf("Fecha de compraventa");
   const iDiasLiq = DIST_TARGETS.indexOf("Días de liquidación");
   const iFechaLiq = DIST_TARGETS.indexOf("Fecha de liquidación");
-  if(iCompra >= 0 && iDiasLiq >= 0 && iFechaLiq >= 0){
+  if(opts.recalcFechaLiq && iCompra >= 0 && iDiasLiq >= 0 && iFechaLiq >= 0){
     let recalculated = 0, skipped = 0;
     for(const r of dat){
       const compra = r[iCompra];
@@ -2291,7 +2294,8 @@ async function runIndividual(){
   log("▶ Leyendo el libro…", "step");
   const wb = await readWorkbookFromFile(currentFile);
 
-  const { dat } = parsePaymentTape(wb);
+  // Por inversionista: la "Fecha de liquidación" va recalculada (compraventa + días).
+  const { dat } = parsePaymentTape(wb, { recalcFechaLiq: true });
 
   const iInvName = DIST_TARGETS.indexOf("Nombre Inversionista");
   const iTot = DIST_TARGETS.indexOf("Total para inversionista");
