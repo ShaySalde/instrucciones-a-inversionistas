@@ -22,3 +22,7 @@ CSV_*_000000*.csv
 
 # Planos contables de traslados (NITs/montos reales) — nunca subir
 Plano_Traslados*.xlsx
+
+# Ejemplos de comprobantes Siigo (recibo de caja / egreso, con NITs/montos reales) — nunca subir
+*factura no negociada*.pdf
+*.pdf

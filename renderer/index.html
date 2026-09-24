@@ -495,20 +495,30 @@
 
     <div class="cfg-group">
       <div class="cfg-head"><span class="cfg-num">3</span><h3>Devolución de facturas no negociadas</h3></div>
-      <p class="cfg-desc">Cada factura no negociada genera un comprobante: <b>débito</b> con la cuenta fija de abajo y <b>crédito</b> con el <b>banco que elijas</b> al registrar (en la pestaña Contabilidad). El <b>NIT del tercero</b> se escribe a mano.</p>
+      <p class="cfg-desc">Genera <b>dos comprobantes</b>: un <b>Recibo de caja</b> (causa la cuenta por pagar con vencimiento) y un <b>Comprobante de egreso</b> (paga y cruza). El <b>NIT del emisor</b> se escribe a mano al registrar; el <b>banco</b> se elige de la lista de abajo.</p>
       <div class="row" style="gap:16px;align-items:flex-start">
-        <label class="cfg-field">Cuenta débito · devolución
+        <label class="cfg-field">Cuenta por pagar (CxP)
           <input type="text" id="sgDevolDebit" inputmode="numeric" placeholder="p. ej. 28150501" autocomplete="off">
-          <span class="cfg-hint">Cuenta contra la que se carga la factura devuelta.</span>
+          <span class="cfg-hint">"Valores recibidos para terceros". Lleva el vencimiento y el NIT del <b>emisor</b>.</span>
+        </label>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
+        <label class="cfg-field">ID tipo documento · Recibo de caja
+          <input type="text" id="sgDocRc" inputmode="numeric" placeholder="ID del comprobante RC" autocomplete="off">
+          <span class="cfg-hint">Tipo de documento <b>“Recibo de caja”</b> en Siigo (su ID numérico).</span>
+        </label>
+        <label class="cfg-field">ID tipo documento · Egreso
+          <input type="text" id="sgDocEgreso" inputmode="numeric" placeholder="ID del comprobante de egreso" autocomplete="off">
+          <span class="cfg-hint">Tipo de documento <b>“Comprobante de egreso”</b> en Siigo (su ID numérico).</span>
         </label>
       </div>
       <div class="cfg-field" style="margin-top:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-          <span>Bancos · crédito de devolución (se dispersa desde estas cuentas)</span>
+          <span>Bancos (se dispersa desde estas cuentas)</span>
           <button class="btn" type="button" id="sgAddBank">+ Agregar banco</button>
         </div>
         <div id="sgBanksList" style="margin-top:8px"></div>
-        <span class="cfg-hint">Cada banco: <b>nombre</b> + <b>cuenta contable</b>. Al registrar una devolución eliges de cuál sale el dinero.</span>
+        <span class="cfg-hint">Cada banco: <b>nombre</b> + <b>cuenta contable</b> + <b>NIT del banco</b> (tercero de la línea del banco). Al registrar eliges de cuál sale/entra el dinero.</span>
       </div>
     </div>
     <div class="row" style="margin-top:12px">
@@ -3188,7 +3198,7 @@ initMailConfig();
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante + línea de crédito listos
 let SIIGO_CREDS_OK = false;            // solo credenciales (usuario + partner + access key)
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", transferDestLiqNit: "", devolDebit: "", devolCredit: "", banks: [] };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", transferDestLiqNit: "", devolDebit: "", devolCredit: "", banks: [], docRcId: "", docEgresoId: "" };
 let LAST_DEVOL_BANK = "";   // última cuenta de banco elegida en devolución (para preseleccionar)
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
@@ -3765,6 +3775,7 @@ function bankRowHTML(b, i){
   return '<div class="bank-cfg-row" data-i="' + i + '" style="display:flex;gap:8px;margin-top:6px;align-items:center">' +
       '<input class="bank-cfg-name" placeholder="Nombre del banco" value="' + escHtml(b.name || "") + '" style="flex:2;border:1px solid var(--hairline);border-radius:9px;padding:9px 11px;font-size:13px;color:var(--ink);background:#fff">' +
       '<input class="bank-cfg-acct" inputmode="numeric" placeholder="Cuenta contable" value="' + escHtml(b.account || "") + '" style="flex:1;border:1px solid var(--hairline);border-radius:9px;padding:9px 11px;font-size:13px;color:var(--ink);background:#fff">' +
+      '<input class="bank-cfg-nit" inputmode="numeric" placeholder="NIT del banco" value="' + escHtml(b.nit || "") + '" style="flex:1;border:1px solid var(--hairline);border-radius:9px;padding:9px 11px;font-size:13px;color:var(--ink);background:#fff">' +
       '<button class="btn danger" type="button" data-act="bank-del" data-i="' + i + '" title="Quitar banco">✕</button>' +
     '</div>';
 }
@@ -3772,10 +3783,12 @@ function readBanksRaw(){
   return Array.from(document.querySelectorAll('#sgBanksList .bank-cfg-row')).map(row => ({
     name: (row.querySelector('.bank-cfg-name').value || ""),
     account: (row.querySelector('.bank-cfg-acct').value || ""),
+    nit: (row.querySelector('.bank-cfg-nit') ? row.querySelector('.bank-cfg-nit').value : ""),
   }));
 }
 function readBanksConfig(){
-  return readBanksRaw().map(b => ({ name: b.name.trim(), account: b.account.trim() })).filter(b => b.name || b.account);
+  return readBanksRaw().map(b => ({ name: b.name.trim(), account: b.account.trim(), nit: (b.nit || "").trim() }))
+    .filter(b => b.name || b.account || b.nit);
 }
 function renderBanksConfig(){
   const wrap = document.getElementById("sgBanksList");
@@ -3799,7 +3812,7 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", transferDestLiqNit: c.transferDestLiqNit || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "", banks: Array.isArray(c.banks) ? c.banks : [] };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", transferDestLiqNit: c.transferDestLiqNit || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "", banks: Array.isArray(c.banks) ? c.banks : [], docRcId: c.docRcId || "", docEgresoId: c.docEgresoId || "" };
     if(typeof renderBanksConfig === "function") renderBanksConfig();
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
     SIIGO_CREDS_OK = !!(c.username && c.partnerId && c.hasAccessKey);
@@ -3822,6 +3835,8 @@ async function initSiigoConfig(){
     if(el("sgTransferDestLiq")) el("sgTransferDestLiq").value = c.transferDestLiq || "";
     if(el("sgTransferDestLiqNit")) el("sgTransferDestLiqNit").value = c.transferDestLiqNit || "";
     if(el("sgDevolDebit")) el("sgDevolDebit").value = c.devolDebit || "";
+    if(el("sgDocRc")) el("sgDocRc").value = c.docRcId || "";
+    if(el("sgDocEgreso")) el("sgDocEgreso").value = c.docEgresoId || "";
     refreshReady(c);  // refreshReady también renderiza la lista de bancos
   } catch(_){}
 
@@ -3848,6 +3863,8 @@ async function initSiigoConfig(){
       transferDestLiq: el("sgTransferDestLiq") ? el("sgTransferDestLiq").value.trim() : "",
       transferDestLiqNit: el("sgTransferDestLiqNit") ? el("sgTransferDestLiqNit").value.trim() : "",
       devolDebit: el("sgDevolDebit") ? el("sgDevolDebit").value.trim() : "",
+      docRcId: el("sgDocRc") ? el("sgDocRc").value.trim() : "",
+      docEgresoId: el("sgDocEgreso") ? el("sgDocEgreso").value.trim() : "",
       banks: readBanksConfig(),
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
