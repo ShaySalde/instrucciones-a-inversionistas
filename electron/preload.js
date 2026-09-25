@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld("api", {
   siigoGetConfig: () => ipcRenderer.invoke("siigo:getConfig"),
   siigoSaveConfig: (payload) => ipcRenderer.invoke("siigo:saveConfig", payload),
   siigoVerify: () => ipcRenderer.invoke("siigo:verify"),
-  siigoGetDocumentTypes: () => ipcRenderer.invoke("siigo:getDocumentTypes"),
+  siigoGetDocumentTypes: (type) => ipcRenderer.invoke("siigo:getDocumentTypes", type),
   siigoGetAccounts: () => ipcRenderer.invoke("siigo:getAccounts"),
   siigoSetAccount: (payload) => ipcRenderer.invoke("siigo:setAccount", payload),
   siigoCreateJournal: (payload) => ipcRenderer.invoke("siigo:createJournal", payload),

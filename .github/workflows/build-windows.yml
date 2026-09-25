@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Mínimo privilegio: el workflow solo necesita leer el repositorio.
+permissions:
+  contents: read
+
 jobs:
   build-windows:
     runs-on: windows-latest

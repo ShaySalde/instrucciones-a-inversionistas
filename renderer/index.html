@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Seguridad: la app es 100% local (no hace peticiones de red desde el renderer;
+     todo va por IPC al proceso principal). Esta CSP bloquea scripts/estilos/recursos
+     remotos y cualquier exfiltración por fetch/XHR/WebSocket a orígenes externos. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Instrucciones a Inversionistas</title>
 <link rel="stylesheet" href="fonts/poppins.css">
 <style>
@@ -504,12 +508,16 @@
       </div>
       <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
         <label class="cfg-field">ID tipo documento · Recibo de caja
-          <input type="text" id="sgDocRc" inputmode="numeric" placeholder="ID del comprobante RC" autocomplete="off">
-          <span class="cfg-hint">Tipo de documento <b>“Recibo de caja”</b> en Siigo (su ID numérico).</span>
+          <input type="text" id="sgDocRc" inputmode="numeric" placeholder="ID del recibo de caja" autocomplete="off">
+          <select id="sgDocRcSelect" style="display:none;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff"></select>
+          <button class="btn" type="button" id="sgLoadRc" style="margin-top:8px">📋 Cargar desde Siigo</button>
+          <span class="cfg-hint">Tipo de documento <b>“Recibo de caja”</b> (RC) en Siigo.</span>
         </label>
         <label class="cfg-field">ID tipo documento · Egreso
           <input type="text" id="sgDocEgreso" inputmode="numeric" placeholder="ID del comprobante de egreso" autocomplete="off">
-          <span class="cfg-hint">Tipo de documento <b>“Comprobante de egreso”</b> en Siigo (su ID numérico).</span>
+          <select id="sgDocEgresoSelect" style="display:none;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff"></select>
+          <button class="btn" type="button" id="sgLoadEgreso" style="margin-top:8px">📋 Cargar desde Siigo</button>
+          <span class="cfg-hint">Tipo de documento <b>“Recibo de pago / egreso”</b> (RP) en Siigo.</span>
         </label>
       </div>
       <div class="cfg-field" style="margin-top:12px">
@@ -3886,24 +3894,31 @@ async function initSiigoConfig(){
     } catch(err){ el("sgStatus").textContent = "Error de conexión"; showToast("Error al probar Siigo.", false); }
   });
 
-  el("sgLoadTypes").addEventListener("click", async () => {
-    const sel = el("sgDocSelect");
-    showToast("Consultando tipos de comprobante…");
-    try {
-      const res = await window.api.siigoGetDocumentTypes();
-      if(res && res.ok && res.types && res.types.length){
-        sel.innerHTML = '<option value="">— elige un tipo —</option>' +
-          res.types.map(t => '<option value="' + t.id + '">' + escHtml((t.name || "") + " (id " + t.id + (t.code ? (" · " + t.code) : "") + ")") + '</option>').join("");
-        sel.style.display = "block";
-        sel.onchange = () => { if(sel.value) el("sgDocId").value = sel.value; };
-        showToast(res.types.length + " tipo(s) cargado(s) — elige uno");
-      } else {
-        const detalle = (res && res.error) ? (" — " + res.error) : "";
-        log("No se pudieron cargar tipos de comprobante: " + (res && res.error), "warn");
-        showToast("No se pudieron cargar tipos" + detalle + ". Puedes escribir el ID a mano.", false);
-      }
-    } catch(err){ showToast("Error consultando tipos.", false); }
-  });
+  // Cargador de tipos de documento por Siigo: llena un <select> y vuelca el id elegido al input.
+  function wireDocLoader(btnId, selId, inputId, type){
+    const btn = el(btnId); if(!btn) return;
+    btn.addEventListener("click", async () => {
+      const sel = el(selId);
+      showToast("Consultando tipos desde Siigo…");
+      try {
+        const res = await window.api.siigoGetDocumentTypes(type);
+        if(res && res.ok && res.types && res.types.length){
+          sel.innerHTML = '<option value="">— elige un tipo —</option>' +
+            res.types.map(t => '<option value="' + t.id + '">' + escHtml((t.name || "") + " (id " + t.id + (t.code ? (" · " + t.code) : "") + ")") + '</option>').join("");
+          sel.style.display = "block";
+          sel.onchange = () => { if(sel.value) el(inputId).value = sel.value; };
+          showToast(res.types.length + " tipo(s) cargado(s) — elige uno");
+        } else {
+          const detalle = (res && res.error) ? (" — " + res.error) : "";
+          log("No se pudieron cargar tipos (" + type + "): " + (res && res.error), "warn");
+          showToast("No se pudieron cargar tipos" + detalle + ". Puedes escribir el ID a mano.", false);
+        }
+      } catch(err){ showToast("Error consultando tipos.", false); }
+    });
+  }
+  wireDocLoader("sgLoadTypes", "sgDocSelect", "sgDocId", "CC");       // comprobante contable
+  wireDocLoader("sgLoadRc", "sgDocRcSelect", "sgDocRc", "RC");        // recibo de caja
+  wireDocLoader("sgLoadEgreso", "sgDocEgresoSelect", "sgDocEgreso", "RP"); // recibo de pago / egreso
 }
 initSiigoConfig();
 

@@ -441,6 +441,17 @@ ipcMain.handle("mail:verify", async () => {
 ipcMain.handle("mail:send", async (_e, { to, subject, body, filename, contentBase64 }) => {
   try {
     const s = loadSettingsRaw();
+    // Defensa en profundidad: validar los destinatarios también aquí (no solo en el
+    // renderer). Descarta cualquier cosa que no sea un correo válido y bloquea CRLF /
+    // corchetes / comillas que podrían usarse para inyectar cabeceras SMTP.
+    const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+    const recipients = (Array.isArray(to) ? to : [to])
+      .filter((x) => typeof x === "string")
+      .map((x) => x.trim())
+      .filter((x) => EMAIL_RE.test(x));
+    if (!recipients.length) return { ok: false, error: "Destinatario de correo inválido." };
+    // El asunto va en una cabecera: sin saltos de línea.
+    const safeSubject = String(subject || "").replace(/[\r\n]+/g, " ").trim();
     const t = makeTransport();
     const from = s.fromName ? `"${s.fromName}" <${s.fromEmail}>` : s.fromEmail;
     const attachments = filename && contentBase64
@@ -448,7 +459,7 @@ ipcMain.handle("mail:send", async (_e, { to, subject, body, filename, contentBas
       : [];
 
     const sig = (s.signatureHtml || "").trim();
-    const mail = { from, to, subject, attachments };
+    const mail = { from, to: recipients, subject: safeSubject, attachments };
     if (sig) {
       let sigHtml = sig;
       if (s.signatureLogo) {
@@ -502,13 +513,14 @@ ipcMain.handle("siigo:verify", async () => {
   try { await siigoAuth(); return { ok: true }; }
   catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
 });
-ipcMain.handle("siigo:getDocumentTypes", async () => {
+ipcMain.handle("siigo:getDocumentTypes", async (_e, type) => {
   try {
-    // En Siigo el tipo de los comprobantes contables (notas de contabilidad / journals) es "CC".
-    const r = await siigoFetch("/v1/document-types?type=CC");
+    // Tipos en Siigo: CC (comprobante contable), RC (recibo de caja), RP (recibo de pago/egreso), FV, NC, FC…
+    const t = String(type || "CC").toUpperCase().replace(/[^A-Z]/g, "") || "CC";
+    const r = await siigoFetch("/v1/document-types?type=" + t);
     if (!r.ok) return { ok: false, error: siigoErr(r) };
     const list = Array.isArray(r.data) ? r.data : (r.data.results || []);
-    return { ok: true, types: list.map(t => ({ id: t.id, code: t.code, name: t.name })) };
+    return { ok: true, types: list.map(dt => ({ id: dt.id, code: dt.code, name: dt.name })) };
   } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
 });
 ipcMain.handle("siigo:getAccounts", () => loadSiigoAccounts());
@@ -670,6 +682,17 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(__dirname, "..", "renderer", "index.html"));
+
+  // Endurecimiento: la app solo debe mostrar su propio archivo local.
+  // No abrir ventanas nuevas dentro de la app; los enlaces http(s) van al
+  // navegador del sistema. Y no permitir navegar fuera del archivo local.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (e, url) => {
+    if (!String(url).startsWith("file://")) e.preventDefault();
+  });
 }
 
 app.whenReady().then(() => {

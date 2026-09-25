@@ -17,7 +17,7 @@
     "xlsx-js-style": "^1.2.0"
   },
   "dependencies": {
-    "nodemailer": "^6.9.16"
+    "nodemailer": "^10.0.10"
   },
   "build": {
     "appId": "co.salde.utilidadesva6s",
