@@ -472,6 +472,12 @@
           <span class="cfg-hint">Cuenta de la obligación del banco. Solo para fuentes de fondeo (BANCO DE OCCIDENTE).</span>
         </label>
       </div>
+      <div class="row" style="margin-top:12px">
+        <label class="cfg-field" style="flex:1;max-width:none">NITs de bancos / fuentes de fondeo (uno por línea, sin DV)
+          <textarea id="sgBankNits" rows="2" placeholder="p. ej. 890300279" style="resize:vertical;font-family:inherit;width:100%"></textarea>
+          <span class="cfg-hint">Si uno de estos NITs aparece como <b>inversionista titular</b> (con la fuente de fondeo vacía), se registrará como <b>abono a crédito (banco)</b>, igual que cuando viene como fuente de fondeo. Útil para Banco de Occidente.</span>
+        </label>
+      </div>
     </div>
 
     <div class="cfg-group">
@@ -2326,10 +2332,18 @@ async function runIndividual(){
   const iNitFuente = DIST_TARGETS.indexOf("NIT fuente de fondeo");
   const iNoOp      = DIST_TARGETS.indexOf("No Operación");
   const iNitInv    = INDIV_COLS.indexOf("NIT inversionista"); // índice dentro de `filtered`
+  const iNitInvDat = DIST_TARGETS.indexOf("NIT inversionista"); // índice dentro de `dat`
 
-  // Partición: fuente de fondeo vacía = restitución al inversionista; con valor = abono a crédito (banco)
-  const grp = new Map();      // Nombre Inversionista -> filas
-  const bankGrp = new Map();  // Nombre fuente de fondeo -> filas
+  // NITs configurados como bancos/fuentes de fondeo: si uno sale como inversionista titular
+  // (con la fuente de fondeo vacía), igual se trata como abono a crédito (banco).
+  const nitDigits = v => String(v ?? "").split("-")[0].replace(/\D/g, "");
+  const bankNitSet = new Set((SIIGO_CFG.bankNits || []).map(nitDigits).filter(Boolean));
+
+  // Partición: fuente de fondeo con valor = abono a crédito (banco); vacía = restitución al
+  // inversionista, salvo que el NIT del titular sea un banco configurado (→ abono a crédito).
+  const grp = new Map();        // Nombre Inversionista -> filas
+  const bankGrp = new Map();    // Nombre (fuente de fondeo o banco titular) -> filas
+  const bankNitOf = new Map();  // Nombre -> NIT del banco, cuando viene del titular
   for(const r of dat){
     const fuente = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
     if(fuente){
@@ -2338,13 +2352,20 @@ async function runIndividual(){
     } else {
       let nm = String((r[iInvName] ?? "")).trim();
       if(!nm) nm = "(sin inversionista)";
-      if(!grp.has(nm)) grp.set(nm, []);
-      grp.get(nm).push(r);
+      const invNit = iNitInvDat >= 0 ? nitDigits(r[iNitInvDat]) : "";
+      if(invNit && bankNitSet.has(invNit)){
+        if(!bankGrp.has(nm)) bankGrp.set(nm, []);
+        bankGrp.get(nm).push(r);
+        if(!bankNitOf.has(nm)) bankNitOf.set(nm, String(r[iNitInvDat] ?? "").trim());
+      } else {
+        if(!grp.has(nm)) grp.set(nm, []);
+        grp.get(nm).push(r);
+      }
     }
   }
   const investors = Array.from(grp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
   const banks = Array.from(bankGrp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
-  log("• Inversionistas: " + investors.length + " · Fuentes de fondeo (abono a crédito): " + banks.length);
+  log("• Inversionistas: " + investors.length + " · Abonos a crédito (banco): " + banks.length);
 
   individualResults = [];
   // --- Inversionistas (restitución de cartera) ---
@@ -2377,6 +2398,7 @@ async function runIndividual(){
       const v = iNitFuente >= 0 ? r[iNitFuente] : null;
       if(v != null && String(v).trim() !== ""){ fuenteNit = String(v).trim(); break; }
     }
+    if(!fuenteNit) fuenteNit = bankNitOf.get(fuente) || "";  // banco que vino como inversionista titular
     const opMap = new Map(); // No Operación -> { noOp, valor }
     let total = 0;
     for(const r of rows){
@@ -3206,7 +3228,7 @@ initMailConfig();
 // ============================================================================
 let SIIGO_READY = false;               // credenciales + tipo de comprobante + línea de crédito listos
 let SIIGO_CREDS_OK = false;            // solo credenciales (usuario + partner + access key)
-let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", transferDestLiqNit: "", devolDebit: "", devolCredit: "", banks: [], docRcId: "", docEgresoId: "" };
+let SIIGO_CFG = { documentId: "", creditAccount: "", creditNit: "", bankDebit: "", transferOrigin: "", transferDestInv: "", transferDestLiq: "", transferDestLiqNit: "", devolDebit: "", devolCredit: "", banks: [], docRcId: "", docEgresoId: "", bankNits: [] };
 let LAST_DEVOL_BANK = "";   // última cuenta de banco elegida en devolución (para preseleccionar)
 let SIIGO_ACCOUNTS = {};               // { nit: { debit, credit } }
 const SIIGO_POSTED = {};               // nit -> { number, id } ya registrados en esta sesión
@@ -3820,7 +3842,7 @@ async function initSiigoConfig(){
     return;
   }
   function refreshReady(c){
-    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", transferDestLiqNit: c.transferDestLiqNit || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "", banks: Array.isArray(c.banks) ? c.banks : [], docRcId: c.docRcId || "", docEgresoId: c.docEgresoId || "" };
+    SIIGO_CFG = { documentId: c.documentId || "", creditAccount: c.creditAccount || "", creditNit: c.creditNit || "", bankDebit: c.bankDebitAccount || "", transferOrigin: c.transferOriginAccount || "", transferDestInv: c.transferDestInv || "", transferDestLiq: c.transferDestLiq || "", transferDestLiqNit: c.transferDestLiqNit || "", devolDebit: c.devolDebit || "", devolCredit: c.devolCredit || "", banks: Array.isArray(c.banks) ? c.banks : [], docRcId: c.docRcId || "", docEgresoId: c.docEgresoId || "", bankNits: Array.isArray(c.bankNits) ? c.bankNits : [] };
     if(typeof renderBanksConfig === "function") renderBanksConfig();
     const cuentasOK = !!(c.documentId && c.creditAccount && c.creditNit);
     SIIGO_CREDS_OK = !!(c.username && c.partnerId && c.hasAccessKey);
@@ -3845,6 +3867,7 @@ async function initSiigoConfig(){
     if(el("sgDevolDebit")) el("sgDevolDebit").value = c.devolDebit || "";
     if(el("sgDocRc")) el("sgDocRc").value = c.docRcId || "";
     if(el("sgDocEgreso")) el("sgDocEgreso").value = c.docEgresoId || "";
+    if(el("sgBankNits")) el("sgBankNits").value = (Array.isArray(c.bankNits) ? c.bankNits : []).join("\n");
     refreshReady(c);  // refreshReady también renderiza la lista de bancos
   } catch(_){}
 
@@ -3874,6 +3897,7 @@ async function initSiigoConfig(){
       docRcId: el("sgDocRc") ? el("sgDocRc").value.trim() : "",
       docEgresoId: el("sgDocEgreso") ? el("sgDocEgreso").value.trim() : "",
       banks: readBanksConfig(),
+      bankNits: (el("sgBankNits") ? el("sgBankNits").value : "").split(/[\n,;]+/).map(s => s.trim()).filter(Boolean),
     };
     if(!payload.username || !payload.partnerId){ showToast("Escribe usuario API y Partner-Id.", false); return; }
     try {

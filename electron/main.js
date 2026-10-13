@@ -312,6 +312,7 @@ function getSiigoConfigPublic() {
     banks: Array.isArray(s.siigoBanks) ? s.siigoBanks : [],    // bancos [{name, account, nit}] para la devolución
     docRcId: s.siigoDocRcId || "",                             // ID tipo documento "Recibo de caja"
     docEgresoId: s.siigoDocEgresoId || "",                     // ID tipo documento "Comprobante de egreso"
+    bankNits: Array.isArray(s.siigoBankNits) ? s.siigoBankNits : [], // NITs de bancos/fuentes de fondeo: si salen como inversionista titular, se tratan como abono a crédito
   };
 }
 // NIT sin dígito de verificación (900.123.456-1 -> 900123456)
@@ -326,7 +327,7 @@ function getSiigoAccessKey() {
   }
   return s.siigoAccessKeyPlain || "";
 }
-function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq, transferDestLiqNit, devolDebit, devolCredit, banks, docRcId, docEgresoId }) {
+function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAccount, creditNit, bankDebitAccount, transferOriginAccount, transferDestInv, transferDestLiq, transferDestLiqNit, devolDebit, devolCredit, banks, docRcId, docEgresoId, bankNits }) {
   const s = loadSettingsRaw();
   s.siigoPartnerId = (partnerId || "").trim();
   s.siigoUsername = (username || "").trim();
@@ -348,6 +349,13 @@ function saveSiigoConfig({ partnerId, username, accessKey, documentId, creditAcc
   }
   if (docRcId !== undefined) s.siigoDocRcId = String(docRcId || "").trim();
   if (docEgresoId !== undefined) s.siigoDocEgresoId = String(docEgresoId || "").trim();
+  if (bankNits !== undefined) {
+    // NITs de bancos/fuentes de fondeo (sin DV, sin duplicados ni vacíos).
+    const seen = new Set();
+    s.siigoBankNits = (Array.isArray(bankNits) ? bankNits : [])
+      .map((n) => nitNoDV(n))
+      .filter((n) => n && !seen.has(n) && seen.add(n));
+  }
   if (typeof accessKey === "string" && accessKey.trim().length) {
     const k = accessKey.trim();
     delete s.siigoAccessKeyPlain;
