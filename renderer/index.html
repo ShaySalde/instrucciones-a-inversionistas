@@ -357,6 +357,7 @@
     <button class="nav-tab active" data-panel="panelConfig" role="tab">⚙ Configuración</button>
     <button class="nav-tab" data-panel="panelApp" role="tab">▶ Operación</button>
     <button class="nav-tab" data-panel="panelSiigo" role="tab">🧾 Contabilidad</button>
+    <button class="nav-tab" data-panel="panelMensual" role="tab">📅 Instrucciones mensuales</button>
   </nav>
 
   <div class="nav-panel active" id="panelConfig" role="tabpanel">
@@ -664,6 +665,125 @@
   </section>
 
   </div><!-- /panelSiigo -->
+
+  <style id="mzStyles">
+  #panelMensual .mz-intro{color:var(--muted);font-size:12.5px;margin:-2px 0 16px;line-height:1.55;max-width:70ch}
+  #panelMensual .mz-drop{padding:26px 22px}
+  /* Chips de archivo */
+  #panelMensual .mz-files{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+  #panelMensual .mz-chip{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--hairline);
+    border-radius:12px;background:linear-gradient(180deg,#fff,#fcfcfe);transition:border-color .15s ease,box-shadow .15s ease}
+  #panelMensual .mz-chip:hover{border-color:#d5cff6;box-shadow:var(--shadow-sm)}
+  #panelMensual .mz-chip.err{border-color:#f0c9c9;background:#fdf5f5}
+  #panelMensual .mz-chip .ic{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;
+    background:var(--tint);color:var(--accent);font-size:14px;font-weight:600}
+  #panelMensual .mz-chip.err .ic{background:#fbe6e6;color:var(--err)}
+  #panelMensual .mz-chip .gr{flex:1;min-width:0}
+  #panelMensual .mz-chip .nm{font-weight:600;font-size:13px;color:var(--ink);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #panelMensual .mz-chip .mt{font-size:11.5px;color:var(--muted);margin-top:1px}
+  #panelMensual .mz-chip.err .mt{color:var(--err)}
+  #panelMensual .mz-chip .rm{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;
+    width:26px;height:26px;border-radius:7px;flex:none;transition:background .15s,color .15s}
+  #panelMensual .mz-chip .rm:hover{background:#f0e9ff;color:var(--accent)}
+  #panelMensual .mz-empty{color:var(--muted);font-size:12.5px;margin:12px 0 0}
+  /* Dispositivo de periodo (elemento distintivo del módulo) */
+  #panelMensual .mz-period{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:15px 18px;border-radius:13px;
+    background:linear-gradient(120deg,var(--tint),#fbf9ff);border:1px solid var(--tint-line)}
+  #panelMensual .mz-seg{display:flex;flex-direction:column;gap:2px}
+  #panelMensual .mz-seg .k{font-size:10.5px;color:var(--muted);font-weight:500}
+  #panelMensual .mz-seg .v{font-size:19px;font-weight:600;color:var(--ink);letter-spacing:-.01em;line-height:1.05}
+  #panelMensual .mz-seg.ins .v{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  #panelMensual .mz-arrow{color:var(--accent);font-size:20px;font-weight:600}
+  #panelMensual .mz-year{margin-left:auto;font-size:13px;color:var(--muted)}
+  #panelMensual .mz-year b{color:var(--ink);font-weight:600}
+  /* Rangos de fecha */
+  #panelMensual .mz-ranges{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:640px){#panelMensual .mz-ranges{grid-template-columns:1fr}}
+  #panelMensual .mz-range{border:1px solid var(--hairline);border-radius:12px;padding:13px 15px;background:#fff}
+  #panelMensual .mz-range > .h{font-size:12px;font-weight:600;color:var(--ink);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  #panelMensual .mz-range > .h .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  #panelMensual .mz-range.liq > .h .dot{background:var(--warn)}
+  #panelMensual .mz-range.ins > .h .dot{background:var(--accent)}
+  #panelMensual .mz-range > .h .sub{color:var(--muted);font-weight:400;font-size:11px}
+  #panelMensual .mz-range .pair{display:flex;gap:10px}
+  #panelMensual .mz-range .pair label{flex:1;font-size:11px;color:var(--muted)}
+  #panelMensual .mz-range input[type=date]{display:block;width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;font-family:inherit;font-size:12.5px;color:var(--ink);background:#fff}
+  #panelMensual .mz-range input[type=date]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+  /* Tira de stats */
+  #panelMensual .mz-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  #panelMensual .mz-stat{display:flex;align-items:baseline;gap:7px;padding:8px 13px;border-radius:10px;background:#f6f7fb;border:1px solid var(--hairline)}
+  #panelMensual .mz-stat .n{font-size:16px;font-weight:600;color:var(--ink)}
+  #panelMensual .mz-stat .l{font-size:11.5px;color:var(--muted)}
+  /* Avisos */
+  #panelMensual .mz-warn{margin-top:12px;padding:11px 13px;border-radius:11px;background:#fff6e6;border:1px solid #f1e0b5;
+    color:#8a5b00;font-size:12px;line-height:1.55;display:flex;gap:9px}
+  #panelMensual .mz-warn .ic{flex:none}
+  /* Resultado */
+  #panelMensual .mz-result{padding:16px 18px;border-radius:13px;background:#eef9f1;border:1px solid #c6e8d1}
+  #panelMensual .mz-result .rh{font-weight:600;color:#1e6b34;font-size:14px;display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  #panelMensual .mz-result .rg{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}
+  @media (max-width:640px){#panelMensual .mz-result .rg{grid-template-columns:1fr}}
+  #panelMensual .mz-result .ri{font-size:12.5px;color:var(--ink)}
+  #panelMensual .mz-result .ri b{color:#1e6b34}
+  #panelMensual .mz-recalc{font-size:11.5px;color:var(--muted);margin:10px 0 0}
+  #panelMensual #mzApCol{display:block;width:100%;max-width:340px;margin-top:5px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:9px;font-family:inherit;font-size:13px;color:var(--ink);background:#fff}
+  #panelMensual #mzApCol:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+  </style>
+
+  <div class="nav-panel" id="panelMensual" role="tabpanel">
+
+  <section class="card">
+    <h2>1 · Sube los payment tapes del mes</h2>
+    <p class="mz-intro">Arrastra uno o varios <b>payment_tape_distribution_AAAA-MM-DD.csv</b>. La fecha de instrucción se toma del <b>nombre</b> del archivo; las demás fechas se copian tal cual, sin recalcular.</p>
+    <label class="drop mz-drop" id="mzDrop">
+      <input type="file" id="mzFileInput" accept=".csv,text/csv" multiple>
+      <p class="big">Arrastra aquí los CSV o haz clic para seleccionar</p>
+      <p class="small">Puedes soltar varios a la vez · solo .csv</p>
+    </label>
+    <div id="mzFileList"></div>
+  </section>
+
+  <section class="card" id="mzConfigCard" style="display:none">
+    <h2>2 · Periodo y columna de aplicación</h2>
+    <label class="cfg-field" style="max-width:340px">Columna para la fecha de aplicación
+      <select id="mzApCol"></select>
+      <span class="cfg-hint">Por defecto "Fecha esperada pago". Se copia tal cual, sin recalcular.</span>
+    </label>
+
+    <div class="mz-ranges" style="margin-top:16px">
+      <div class="mz-range liq">
+        <p class="h"><span class="dot"></span>Liquidación <span class="sub">· mes anterior</span></p>
+        <div class="pair">
+          <label>Desde<input type="date" id="mzLiqDesde"></label>
+          <label>Hasta (excl.)<input type="date" id="mzLiqHasta"></label>
+        </div>
+      </div>
+      <div class="mz-range ins">
+        <p class="h"><span class="dot"></span>Instrucción <span class="sub">· mes reportado</span></p>
+        <div class="pair">
+          <label>Desde<input type="date" id="mzInsDesde"></label>
+          <label>Hasta (excl.)<input type="date" id="mzInsHasta"></label>
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--muted);font-size:11.5px;margin:10px 0 0">Los límites "hasta" son exclusivos. Al Resumen solo entran los pagos liquidados en el mes anterior al de instrucción.</p>
+
+    <div id="mzPreview" style="margin-top:16px"></div>
+  </section>
+
+  <section class="card" id="mzGenCard" style="display:none">
+    <h2>3 · Genera el Excel</h2>
+    <div class="row">
+      <button class="btn primary" id="mzGenerate" disabled>⬇ Generar Excel</button>
+      <span class="status-pill" id="mzStatus">Listo</span>
+    </div>
+    <p class="mz-recalc">El Resumen usa fórmulas SUMIFS; Excel las calcula al abrir el archivo.</p>
+    <div id="mzResult"></div>
+  </section>
+
+  </div><!-- /panelMensual -->
 
   <footer><b>Liquitech</b> · Instrucciones a Inversionistas — herramienta autocontenida, funciona sin conexión a internet.</footer>
 </div>
@@ -3957,6 +4077,357 @@ function showTab(panelId){
 document.querySelectorAll(".nav-tab").forEach(t => {
   t.addEventListener("click", () => showTab(t.dataset.panel));
 });
+
+// ============================================================================
+//  Instrucciones mensuales de pago (📅)
+//  Sube varios payment_tape_distribution_AAAA-MM-DD.csv de un mes y genera un
+//  Excel con 3 hojas (Detalle, Resumen con SUMIFS, Notas). La fecha de
+//  instrucción sale del NOMBRE del archivo; las demás fechas se copian tal cual
+//  (NO se recalcula ninguna). Flujo independiente de runIndividual/runDistribuir.
+// ============================================================================
+const MZ_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const MZ_MESES_FULL = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const MZ_AP_DEFAULT = "Fecha esperada pago";
+const MZ_REQUIRED = ["Fecha de liquidación", "Nombre Inversionista", "Total para inversionista"];
+let MZ_FILES = [];          // [{ name, insSerial, headers, hdrDict, rows } | { name, error }]
+let MZ_DATES_TOUCHED = false;
+
+// ---- utilidades puras (sin DOM, testeables en Node) -----------------------
+function mzDateSerialFromName(name){
+  const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(name || ""));
+  if(!m) return null;
+  const s = Math.round((Date.UTC(+m[1], +m[2]-1, +m[3]) - XL_EPOCH_UTC) / 86400000);
+  return isFinite(s) ? s : null;
+}
+function mzToSerial(v){                 // fecha -> serial Excel (tolerante); null si no se puede
+  if(v == null || v === "") return null;
+  if(v instanceof Date) return isNaN(v) ? null : dateToExcelSerial(v);
+  if(typeof v === "number" && isFinite(v)) return Math.round(v);
+  const s = String(v).trim();
+  let m = /(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if(m){ const n = Math.round((Date.UTC(+m[1], +m[2]-1, +m[3]) - XL_EPOCH_UTC) / 86400000); return isFinite(n) ? n : null; }
+  m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(s);
+  if(m){ const n = Math.round((Date.UTC(+m[3], +m[2]-1, +m[1]) - XL_EPOCH_UTC) / 86400000); return isFinite(n) ? n : null; }
+  return null;
+}
+function mzToNum(v){                     // total -> número; null si vacío/no numérico
+  if(v == null || v === "") return null;
+  if(typeof v === "number") return isFinite(v) ? v : null;
+  const n = parseFloat(String(v).replace(/[^\d.\-]/g, ""));
+  return isFinite(n) ? n : null;
+}
+function mzMonthKey(serial){ const d = serialToDate(serial); return d.getUTCFullYear()*12 + d.getUTCMonth(); }
+function mzKeyToBounds(key){             // mes de instrucción -> los 4 límites (liq = mes anterior)
+  const y = Math.floor(key/12), mo = key % 12;
+  const ser = (yy,mm) => Math.round((Date.UTC(yy, mm, 1) - XL_EPOCH_UTC) / 86400000);
+  return { insDesde: ser(y, mo), insHasta: ser(y, mo+1), liqDesde: ser(y, mo-1), liqHasta: ser(y, mo) };
+}
+function mzModeMonthKey(serials){        // mes predominante (moda); empate -> el más reciente
+  const counts = new Map();
+  for(const s of serials){ if(s == null) continue; const k = mzMonthKey(s); counts.set(k, (counts.get(k)||0)+1); }
+  let best = null, bestN = -1;
+  for(const [k, n] of counts){ if(n > bestN || (n === bestN && k > best)){ best = k; bestN = n; } }
+  return best;
+}
+function mzDetectBounds(){
+  const key = mzModeMonthKey(MZ_FILES.filter(f => !f.error).map(f => f.insSerial));
+  return key == null ? null : mzKeyToBounds(key);
+}
+
+// ---- lectura de un CSV ----------------------------------------------------
+async function mzReadFile(file){
+  const insSerial = mzDateSerialFromName(file.name);
+  if(insSerial == null) return { name: file.name, error: "No pude extraer la fecha AAAA-MM-DD del nombre del archivo." };
+  let wb;
+  try { wb = await readWorkbookFromFile(file); }
+  catch(e){ return { name: file.name, error: "No pude leer el archivo: " + (e && e.message || e) }; }
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if(!ws) return { name: file.name, error: "El archivo no tiene hojas." };
+  const aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
+  if(!aoa.length) return { name: file.name, error: "El archivo está vacío." };
+  const headers = (aoa[0] || []).map(h => h == null ? "" : String(h));
+  let rows = aoa.slice(1).filter(r => r.some(v => v !== null && v !== ""));
+  const hdrDict = {};
+  headers.forEach((h, j) => { const k = normKey(h); if(k && !(k in hdrDict)) hdrDict[k] = j; });
+  const missing = MZ_REQUIRED.filter(name => !(normKey(name) in hdrDict));
+  if(missing.length) return { name: file.name, error: "Faltan columnas requeridas: " + missing.join(", ") };
+  return { name: file.name, insSerial, headers, hdrDict, rows };
+}
+function mzColIdx(entry, name){ const k = normKey(name); return (k in entry.hdrDict) ? entry.hdrDict[k] : -1; }
+
+// ---- matriz Detalle (pura) ------------------------------------------------
+function mzBuildDetalle(apColName){
+  const out = []; let nBlank = 0; const names = new Set();
+  for(const f of MZ_FILES){
+    if(f.error) continue;
+    const iLiq = mzColIdx(f, "Fecha de liquidación");
+    const iNom = mzColIdx(f, "Nombre Inversionista");
+    const iTot = mzColIdx(f, "Total para inversionista");
+    const iAp  = apColName ? mzColIdx(f, apColName) : -1;
+    for(const r of f.rows){
+      const aplicacion  = iAp  >= 0 ? mzToSerial(r[iAp])  : null;
+      const liquidacion = iLiq >= 0 ? mzToSerial(r[iLiq]) : null;
+      const nombre      = String((iNom >= 0 ? r[iNom] : "") ?? "").trim();
+      const total       = iTot >= 0 ? mzToNum(r[iTot])   : null;
+      if(aplicacion == null || liquidacion == null || nombre === "") nBlank++;
+      names.add(nombre);
+      out.push({ aplicacion, instruccion: f.insSerial, liquidacion, nombre, total });
+    }
+  }
+  return { rows: out, nBlank, names };
+}
+
+// ---- generación del libro (Detalle + Resumen con SUMIFS + Notas) ----------
+function mzBuildWorkbook(detalle, crit, apColName){
+  const wb = XLSX.utils.book_new();
+  const RESNUM = "#,##0.00;(#,##0.00);-", DATEFMT = "yyyy-mm-dd", NUMFMT = "#,##0.00";
+  const headStyle = { font:{ name:"Segoe UI", sz:10, bold:true, color:{ rgb:"FFFFFFFF" } },
+    fill:{ patternType:"solid", fgColor:{ rgb:"FF1F3864" } },
+    alignment:{ horizontal:"center", vertical:"center", wrapText:true } };
+  const dataFont = { font:{ name:"Calibri", sz:10 } };
+
+  // ===== Detalle =====
+  const HEAD = ["FECHA DE APLICACION","FECHA DE INSTRUCCION","FECHA DE LIQUIDACION","NOMBRE DE INVERSIONISTA","TOTAL A INVERSIONISTA"];
+  const aoa = [HEAD.slice()];
+  for(const r of detalle.rows) aoa.push([ r.aplicacion, r.instruccion, r.liquidacion, (r.nombre ? r.nombre : null), r.total ]);
+  const wsD = XLSX.utils.aoa_to_sheet(aoa);
+  const nRows = detalle.rows.length;
+  for(let c=0;c<HEAD.length;c++){ const a = XLSX.utils.encode_cell({r:0,c}); if(wsD[a]) wsD[a].s = headStyle; }
+  for(let i=0;i<nRows;i++){
+    const R = i+1;
+    for(const c of [0,1,2]){ const a = XLSX.utils.encode_cell({r:R,c}); const cell = wsD[a]; if(cell && typeof cell.v === "number"){ cell.t="n"; cell.z=DATEFMT; } }
+    const at = XLSX.utils.encode_cell({r:R,c:4}); const ct = wsD[at]; if(ct && typeof ct.v === "number"){ ct.t="n"; ct.z=NUMFMT; }
+    for(let c=0;c<HEAD.length;c++){ const a = XLSX.utils.encode_cell({r:R,c}); if(wsD[a]) wsD[a].s = dataFont; }
+  }
+  wsD["!cols"] = [{wch:18},{wch:20},{wch:18},{wch:48},{wch:20}];
+  wsD["!autofilter"] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:Math.max(1,nRows),c:4} }) };
+  XLSX.utils.book_append_sheet(wb, wsD, "Detalle");
+
+  // ===== Resumen =====
+  const insDates = [...new Set(detalle.rows.map(r=>r.instruccion).filter(s=>s!=null && s>=crit.insDesde && s<crit.insHasta))].sort((a,b)=>a-b);
+  const namesArr = [...detalle.names];
+  const hasBlank = namesArr.includes("");
+  const invRows = namesArr.filter(n=>n!=="").sort((a,b)=>a.localeCompare(b,"es",{sensitivity:"base"})).map(n=>({name:n,sin:false}));
+  if(hasBlank) invRows.push({ name:"(Sin nombre)", sin:true });
+
+  const wsR = {}; let maxR=0, maxC=0;
+  const put = (r,c,cell)=>{ wsR[XLSX.utils.encode_cell({r,c})]=cell; if(r>maxR)maxR=r; if(c>maxC)maxC=c; };
+  const colL = c => XLSX.utils.encode_col(c);
+  const yellow = { font:{ name:"Segoe UI", sz:10, bold:true, color:{ rgb:"FF1F3864" } }, fill:{ patternType:"solid", fgColor:{ rgb:"FFFFE699" } }, alignment:{ horizontal:"center" }, z:DATEFMT };
+  const lblStyle = { font:{ name:"Segoe UI", sz:10, bold:true, color:{ rgb:"FF1F3864" } } };
+  const totStyle = { font:{ name:"Segoe UI", sz:10, bold:true }, fill:{ patternType:"solid", fgColor:{ rgb:"FFEAE6FB" } } };
+
+  put(0,0,{ t:"s", v:"Resumen de instrucciones de pago", s:{ font:{ name:"Segoe UI", sz:13, bold:true, color:{ rgb:"FF1F3864" } } } });
+  const critRows = [["Liquidación desde", crit.liqDesde],["Liquidación hasta (excl.)", crit.liqHasta],["Instrucción desde", crit.insDesde],["Instrucción hasta (excl.)", crit.insHasta]];
+  critRows.forEach((cr,i) => { const R=2+i; put(R,0,{ t:"s", v:cr[0], s:lblStyle }); put(R,1,{ t:"n", v:cr[1], z:DATEFMT, s:yellow }); });
+
+  const HR = 7, totCol = 1 + insDates.length;
+  put(HR,0,{ t:"s", v:"Inversionista", s:headStyle });
+  insDates.forEach((s,j) => put(HR, 1+j, { t:"n", v:s, z:DATEFMT, s:headStyle }));
+  put(HR, totCol, { t:"s", v:"TOTAL", s:headStyle });
+
+  const firstA1 = HR+2, lastA1 = HR+1+invRows.length;
+  const RANGES = 'Detalle!$B:$B,">="&$B$5,Detalle!$B:$B,"<"&$B$6,Detalle!$C:$C,">="&$B$3,Detalle!$C:$C,"<"&$B$4';
+  invRows.forEach((inv,ri) => {
+    const R = HR+1+ri, a1 = R+1;
+    put(R,0,{ t:"s", v:inv.name, s:dataFont });
+    const nameCrit = inv.sin ? '"="' : ('$A'+a1);
+    insDates.forEach((s,j) => {
+      const dateRef = colL(1+j) + "$" + (HR+1);
+      const f = 'SUMIFS(Detalle!$E:$E,Detalle!$D:$D,'+nameCrit+',Detalle!$B:$B,'+dateRef+','+RANGES+')';
+      put(R, 1+j, { t:"n", f:f, z:RESNUM, s:dataFont });
+    });
+    put(R, totCol, { t:"n", f:'SUMIFS(Detalle!$E:$E,Detalle!$D:$D,'+nameCrit+','+RANGES+')', z:RESNUM, s:{ font:{ name:"Calibri", sz:10, bold:true } } });
+  });
+
+  const TR = HR+1+invRows.length;
+  put(TR,0,{ t:"s", v:"TOTAL", s:totStyle });
+  for(let j=0;j<insDates.length;j++){ const L=colL(1+j); put(TR,1+j,{ t:"n", f:'SUM('+L+firstA1+':'+L+lastA1+')', z:RESNUM, s:totStyle }); }
+  const TL = colL(totCol);
+  put(TR, totCol, { t:"n", f:'SUM('+TL+firstA1+':'+TL+lastA1+')', z:RESNUM, s:totStyle });
+
+  const CR = TR+2, grandCell = TL+(TR+1);
+  put(CR,0,{ t:"s", v:"Control (debe ser 0)", s:lblStyle });
+  put(CR,1,{ t:"n", f:grandCell+'-SUMIFS(Detalle!$E:$E,'+RANGES+')', z:RESNUM, s:{ font:{ name:"Segoe UI", sz:10, bold:true, color:{ rgb:"FFB00020" } } } });
+
+  wsR["!ref"] = XLSX.utils.encode_range({ s:{r:0,c:0}, e:{ r:Math.max(maxR,CR), c:Math.max(maxC,totCol) } });
+  wsR["!cols"] = [{wch:46}].concat(insDates.map(()=>({wch:16}))).concat([{wch:18}]);
+  wsR["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:Math.max(totCol,1)} }];
+  const mesIns = MZ_MESES[serialToDate(crit.insDesde).getUTCMonth()];
+  const mesLiq = MZ_MESES[serialToDate(crit.liqDesde).getUTCMonth()];
+  const anio = serialToDate(crit.insDesde).getUTCFullYear();
+  XLSX.utils.book_append_sheet(wb, wsR, ("Resumen " + mesLiq + "-" + mesIns + " " + anio).slice(0,31));
+
+  // ===== Notas =====
+  const wsN = XLSX.utils.aoa_to_sheet([
+    ["Notas y supuestos"],
+    [],
+    ["Cantidad de filas (Detalle):", null],
+    ["Total general (Detalle):", null],
+    [],
+    ["Supuestos:"],
+    ["• FECHA DE INSTRUCCION se toma del NOMBRE del archivo (AAAA-MM-DD), no del contenido."],
+    ["• FECHA DE LIQUIDACION se copia de la columna 'Fecha de liquidación' — no se recalcula."],
+    ["• FECHA DE APLICACION se copia de la columna '" + (apColName || MZ_AP_DEFAULT) + "' (por defecto 'Fecha esperada pago') — no se recalcula; supuesto: application_date viene vacía."],
+    ["• TOTAL A INVERSIONISTA = columna 'Total para inversionista'."],
+    ["• Las filas sin fecha o sin nombre se dejan en blanco; en el Resumen las filas sin nombre se agrupan como '(Sin nombre)'."],
+    ["• No se unifican nombres parecidos: cada nombre exacto es un inversionista aparte."],
+    ["• El Resumen usa fórmulas SUMIFS; Excel las calcula al abrir el archivo."],
+  ]);
+  wsN["B3"] = { t:"n", f:"COUNTA(Detalle!$B:$B)-1" };
+  wsN["B4"] = { t:"n", f:"SUM(Detalle!$E:$E)", z:NUMFMT };
+  if(wsN["A1"]) wsN["A1"].s = { font:{ name:"Segoe UI", sz:12, bold:true, color:{ rgb:"FF1F3864" } } };
+  wsN["!cols"] = [{wch:34},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsN, "Notas");
+  return wb;
+}
+
+// ---- UI -------------------------------------------------------------------
+function mzEl(id){ return document.getElementById(id); }
+function mzAllHeaders(){ const set = new Set(); MZ_FILES.forEach(f => { if(!f.error) f.headers.forEach(h => { if(h) set.add(h); }); }); return [...set]; }
+
+function mzRenderFiles(){
+  const box = mzEl("mzFileList"); if(!box) return;
+  if(!MZ_FILES.length){ box.innerHTML = '<p class="mz-empty">Aún no has subido archivos.</p>'; return; }
+  box.innerHTML = '<div class="mz-files">' + MZ_FILES.map((f,i) => {
+    const ok = !f.error;
+    const meta = ok ? (f.rows.length + " fila(s) · instrucción " + serialToYMD(f.insSerial)) : f.error;
+    return '<div class="mz-chip' + (ok ? '' : ' err') + '">'
+      + '<span class="ic">' + (ok ? '📄' : '!') + '</span>'
+      + '<span class="gr"><div class="nm">' + escHtml(f.name) + '</div><div class="mt">' + escHtml(meta) + '</div></span>'
+      + '<button class="rm" title="Quitar" data-mzrm="' + i + '">✕</button></div>';
+  }).join("") + '</div>';
+  box.querySelectorAll("[data-mzrm]").forEach(b => b.addEventListener("click", () => { MZ_FILES.splice(Number(b.dataset.mzrm), 1); mzAfterChange(); }));
+}
+
+function mzPopulateApSelector(){
+  const sel = mzEl("mzApCol"); if(!sel) return;
+  const prev = sel.value;
+  const heads = mzAllHeaders();
+  const options = heads.length ? heads : [MZ_AP_DEFAULT];
+  const def = heads.includes(MZ_AP_DEFAULT) ? MZ_AP_DEFAULT : (options[0] || MZ_AP_DEFAULT);
+  sel.innerHTML = options.map(h => '<option value="' + escHtml(h) + '">' + escHtml(h) + '</option>').join("");
+  sel.value = (prev && options.includes(prev)) ? prev : def;
+}
+
+function mzReadDateInputs(){
+  return { liqDesde: ymdToSerial(mzEl("mzLiqDesde").value), liqHasta: ymdToSerial(mzEl("mzLiqHasta").value),
+           insDesde: ymdToSerial(mzEl("mzInsDesde").value), insHasta: ymdToSerial(mzEl("mzInsHasta").value) };
+}
+function mzSetDateInputs(b){
+  mzEl("mzLiqDesde").value = b.liqDesde!=null ? serialToYMD(b.liqDesde) : "";
+  mzEl("mzLiqHasta").value = b.liqHasta!=null ? serialToYMD(b.liqHasta) : "";
+  mzEl("mzInsDesde").value = b.insDesde!=null ? serialToYMD(b.insDesde) : "";
+  mzEl("mzInsHasta").value = b.insHasta!=null ? serialToYMD(b.insHasta) : "";
+}
+
+function mzAfterChange(){
+  const anyOk = MZ_FILES.some(f => !f.error);
+  if(mzEl("mzConfigCard")) mzEl("mzConfigCard").style.display = anyOk ? "block" : "none";
+  if(mzEl("mzGenCard")) mzEl("mzGenCard").style.display = anyOk ? "block" : "none";
+  mzRenderFiles();
+  mzPopulateApSelector();
+  if(anyOk && !MZ_DATES_TOUCHED){ const b = mzDetectBounds(); if(b) mzSetDateInputs(b); }
+  mzRefreshPreview();
+}
+
+function mzRefreshPreview(){
+  const box = mzEl("mzPreview"); if(!box) return;
+  const okFiles = MZ_FILES.filter(f => !f.error);
+  if(!okFiles.length){ box.innerHTML = ""; if(mzEl("mzGenerate")) mzEl("mzGenerate").disabled = true; return; }
+  const apCol = mzEl("mzApCol").value || MZ_AP_DEFAULT;
+  const det = mzBuildDetalle(apCol);
+  const crit = mzReadDateInputs();
+  const complete = crit.insDesde!=null && crit.insHasta!=null && crit.liqDesde!=null && crit.liqHasta!=null;
+  let html = "";
+  if(complete){
+    const mLiq = MZ_MESES_FULL[serialToDate(crit.liqDesde).getUTCMonth()];
+    const mIns = MZ_MESES_FULL[serialToDate(crit.insDesde).getUTCMonth()];
+    const yr = serialToDate(crit.insDesde).getUTCFullYear();
+    html += '<div class="mz-period">'
+      + '<div class="mz-seg liq"><span class="k">Liquidación</span><span class="v">' + mLiq + '</span></div>'
+      + '<span class="mz-arrow">→</span>'
+      + '<div class="mz-seg ins"><span class="k">Instrucción</span><span class="v">' + mIns + '</span></div>'
+      + '<span class="mz-year">Año <b>' + yr + '</b></span></div>';
+  }
+  html += '<div class="mz-stats">'
+    + '<div class="mz-stat"><span class="n">' + okFiles.length + '</span><span class="l">archivo(s)' + (MZ_FILES.length-okFiles.length ? ' · ' + (MZ_FILES.length-okFiles.length) + ' con error' : '') + '</span></div>'
+    + '<div class="mz-stat"><span class="n">' + det.rows.length + '</span><span class="l">fila(s) de detalle</span></div>'
+    + '<div class="mz-stat"><span class="n">' + det.nBlank + '</span><span class="l">con datos vacíos</span></div>'
+    + '</div>';
+  const warns = [];
+  if(complete){
+    const fuera = okFiles.filter(f => !(f.insSerial>=crit.insDesde && f.insSerial<crit.insHasta));
+    if(fuera.length) warns.push("Archivos con instrucción fuera del mes elegido: " + fuera.map(f => serialToYMD(f.insSerial)).join(", ") + " — van al Detalle, no al Resumen.");
+  }
+  if(det.nBlank) warns.push(det.nBlank + " fila(s) con fecha o nombre vacío: se dejan en blanco.");
+  if(warns.length) html += '<div class="mz-warn"><span class="ic">⚠</span><span>' + warns.map(escHtml).join('<br>') + '</span></div>';
+  box.innerHTML = html;
+  if(mzEl("mzGenerate")) mzEl("mzGenerate").disabled = !(det.rows.length && complete);
+}
+
+async function mzAddFiles(fileList){
+  const arr = Array.from(fileList || []).filter(f => /\.csv$/i.test(f.name));
+  if(!arr.length){ showToast("Sube archivos .csv", false); return; }
+  for(const file of arr){
+    if(MZ_FILES.some(f => f.name === file.name)) continue;
+    MZ_FILES.push(await mzReadFile(file));
+  }
+  mzAfterChange();
+}
+
+function mzGenerate(){
+  const okFiles = MZ_FILES.filter(f => !f.error);
+  if(!okFiles.length){ showToast("No hay archivos válidos.", false); return; }
+  const apCol = mzEl("mzApCol").value || MZ_AP_DEFAULT;
+  const crit = mzReadDateInputs();
+  if([crit.liqDesde,crit.liqHasta,crit.insDesde,crit.insHasta].some(x => x==null)){ showToast("Completa las 4 fechas del periodo.", false); return; }
+  const det = mzBuildDetalle(apCol);
+  if(!det.rows.length){ showToast("No hay filas para generar.", false); return; }
+  mzEl("mzStatus").textContent = "Generando…";
+  try {
+    const wb = mzBuildWorkbook(det, crit, apCol);
+    const outBuf = XLSX.write(wb, { bookType:"xlsx", type:"array" });
+    const blob = new Blob([outBuf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "instrucciones_inversionistas.xlsx";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    mzEl("mzStatus").textContent = "Generado ✓";
+    const inRange = det.rows.filter(r => r.instruccion>=crit.insDesde && r.instruccion<crit.insHasta && r.liquidacion!=null && r.liquidacion>=crit.liqDesde && r.liquidacion<crit.liqHasta);
+    const totalPeriodo = inRange.reduce((s,r)=>s+(r.total||0),0);
+    const names = new Set(det.rows.map(r=>r.nombre || "(Sin nombre)"));
+    const conMonto = new Set(inRange.filter(r=>(r.total||0)!==0).map(r=>r.nombre || "(Sin nombre)"));
+    const enCero = [...names].filter(n => !conMonto.has(n)).length;
+    mzEl("mzResult").innerHTML =
+      '<div class="mz-result"><div class="rh">✓ instrucciones_inversionistas.xlsx descargado</div>'
+      + '<div class="rg">'
+      + '<div class="ri">Total del periodo (en rango): <b>' + fmtCOP(totalPeriodo) + '</b></div>'
+      + '<div class="ri">Inversionistas en 0: <b>' + enCero + '</b></div>'
+      + '<div class="ri">Filas con datos vacíos: <b>' + det.nBlank + '</b></div>'
+      + '<div class="ri">Columna de aplicación: <b>' + escHtml(apCol) + '</b></div>'
+      + '</div><p class="mz-recalc">El Resumen se recalcula al abrir en Excel.</p></div>';
+    showToast("Excel generado — Excel calculará las fórmulas al abrir.");
+  } catch(err){
+    mzEl("mzStatus").textContent = "Error";
+    log("Error generando instrucciones mensuales: " + (err && err.message || err), "err");
+    showToast("No se pudo generar el Excel: " + (err && err.message || err), false);
+  }
+}
+
+function mzInit(){
+  const drop = mzEl("mzDrop"), input = mzEl("mzFileInput");
+  if(!drop || !input) return;
+  input.addEventListener("change", () => { mzAddFiles(input.files); input.value = ""; });
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("drag"); }));
+  drop.addEventListener("drop", e => { if(e.dataTransfer && e.dataTransfer.files) mzAddFiles(e.dataTransfer.files); });
+  const ap = mzEl("mzApCol"); if(ap) ap.addEventListener("change", mzRefreshPreview);
+  ["mzLiqDesde","mzLiqHasta","mzInsDesde","mzInsHasta"].forEach(id => { const e = mzEl(id); if(e) e.addEventListener("input", () => { MZ_DATES_TOUCHED = true; mzRefreshPreview(); }); });
+  const gen = mzEl("mzGenerate"); if(gen) gen.addEventListener("click", mzGenerate);
+  mzRenderFiles();
+}
+mzInit();
 
 // ============================================================================
 //  Directorio de inversionistas (pestaña Configuración)
