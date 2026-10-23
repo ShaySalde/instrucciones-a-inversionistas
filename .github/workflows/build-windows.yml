@@ -7,9 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Mínimo privilegio: el workflow solo necesita leer el repositorio.
+# Necesita escribir en el repo para publicar la Release con el .exe.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -30,9 +30,35 @@ jobs:
       - name: Build Windows installer
         run: npm run dist
 
-      - name: Upload installer
+      # Artifact versionado: historial de cada build (caduca a los ~90 días).
+      - name: Upload installer (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: Instrucciones-a-Inversionistas-Windows-Installer
           path: dist/*.exe
           if-no-files-found: error
+
+      # Copia el .exe a un nombre estable (sin versión) para tener un link fijo.
+      - name: Copiar a nombre estable
+        shell: bash
+        run: |
+          exe=$(ls dist/*.exe | head -1)
+          cp "$exe" "dist/Instrucciones-a-Inversionistas-Setup.exe"
+          echo "APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      # Release "latest" rolling: siempre la misma URL de descarga.
+      - name: Publicar Release (latest)
+        uses: softprops/action-gh-release@v2.0.8
+        with:
+          tag_name: latest
+          name: Última versión (Windows)
+          body: |
+            Instalador de Windows siempre actualizado al último push a `main`.
+
+            **Versión del paquete:** ${{ env.APP_VERSION }}
+            **Commit:** ${{ github.sha }}
+
+            Descarga directa (link fijo):
+            https://github.com/${{ github.repository }}/releases/latest/download/Instrucciones-a-Inversionistas-Setup.exe
+          make_latest: true
+          files: dist/Instrucciones-a-Inversionistas-Setup.exe
