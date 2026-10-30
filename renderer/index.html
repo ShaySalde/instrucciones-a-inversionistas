@@ -757,18 +757,18 @@
         <p class="h"><span class="dot"></span>Liquidación <span class="sub">· mes anterior</span></p>
         <div class="pair">
           <label>Desde<input type="date" id="mzLiqDesde"></label>
-          <label>Hasta (excl.)<input type="date" id="mzLiqHasta"></label>
+          <label>Hasta (incluido)<input type="date" id="mzLiqHasta"></label>
         </div>
       </div>
       <div class="mz-range ins">
         <p class="h"><span class="dot"></span>Instrucción <span class="sub">· mes reportado</span></p>
         <div class="pair">
           <label>Desde<input type="date" id="mzInsDesde"></label>
-          <label>Hasta (excl.)<input type="date" id="mzInsHasta"></label>
+          <label>Hasta (incluido)<input type="date" id="mzInsHasta"></label>
         </div>
       </div>
     </div>
-    <p style="color:var(--muted);font-size:11.5px;margin:10px 0 0">Los límites "hasta" son exclusivos. Al Resumen solo entran los pagos liquidados en el mes anterior al de instrucción.</p>
+    <p style="color:var(--muted);font-size:11.5px;margin:10px 0 0">Los límites "hasta" son inclusivos (incluyen ese día). Al Resumen solo entran los pagos liquidados en el mes anterior al de instrucción.</p>
 
     <div id="mzPreview" style="margin-top:16px"></div>
   </section>
@@ -4218,7 +4218,8 @@ function mzBuildWorkbook(detalle, crit, apColName){
   const totStyle = { font:{ name:"Segoe UI", sz:10, bold:true }, fill:{ patternType:"solid", fgColor:{ rgb:"FFEAE6FB" } } };
 
   put(0,0,{ t:"s", v:"Resumen de instrucciones de pago", s:{ font:{ name:"Segoe UI", sz:13, bold:true, color:{ rgb:"FF1F3864" } } } });
-  const critRows = [["Liquidación desde", crit.liqDesde],["Liquidación hasta (excl.)", crit.liqHasta],["Instrucción desde", crit.insDesde],["Instrucción hasta (excl.)", crit.insHasta]];
+  // 'crit' usa límites exclusivos; en el Excel mostramos el último día INCLUIDO (hasta - 1) y el SUMIFS compara con "<=".
+  const critRows = [["Liquidación desde", crit.liqDesde],["Liquidación hasta (incluido)", crit.liqHasta-1],["Instrucción desde", crit.insDesde],["Instrucción hasta (incluido)", crit.insHasta-1]];
   critRows.forEach((cr,i) => { const R=2+i; put(R,0,{ t:"s", v:cr[0], s:lblStyle }); put(R,1,{ t:"n", v:cr[1], z:DATEFMT, s:yellow }); });
 
   const HR = 7, totCol = 1 + insDates.length;
@@ -4227,7 +4228,7 @@ function mzBuildWorkbook(detalle, crit, apColName){
   put(HR, totCol, { t:"s", v:"TOTAL", s:headStyle });
 
   const firstA1 = HR+2, lastA1 = HR+1+invRows.length;
-  const RANGES = 'Detalle!$B:$B,">="&$B$5,Detalle!$B:$B,"<"&$B$6,Detalle!$C:$C,">="&$B$3,Detalle!$C:$C,"<"&$B$4';
+  const RANGES = 'Detalle!$B:$B,">="&$B$5,Detalle!$B:$B,"<="&$B$6,Detalle!$C:$C,">="&$B$3,Detalle!$C:$C,"<="&$B$4';
   invRows.forEach((inv,ri) => {
     const R = HR+1+ri, a1 = R+1;
     put(R,0,{ t:"s", v:inv.name, s:dataFont });
@@ -4311,14 +4312,19 @@ function mzPopulateApSelector(){
 }
 
 function mzReadDateInputs(){
-  return { liqDesde: ymdToSerial(mzEl("mzLiqDesde").value), liqHasta: ymdToSerial(mzEl("mzLiqHasta").value),
-           insDesde: ymdToSerial(mzEl("mzInsDesde").value), insHasta: ymdToSerial(mzEl("mzInsHasta").value) };
+  // Los campos "hasta" son INCLUSIVOS en la UI (el día escrito cuenta). Internamente usamos
+  // límites exclusivos, así que sumamos 1 día al leerlos. (Antes "hasta" era exclusivo y
+  // dejaba por fuera el último día del mes — p. ej. todas las liquidaciones del 31 de agosto.)
+  const incl = v => { const s = ymdToSerial(v); return s==null ? null : s+1; };
+  return { liqDesde: ymdToSerial(mzEl("mzLiqDesde").value), liqHasta: incl(mzEl("mzLiqHasta").value),
+           insDesde: ymdToSerial(mzEl("mzInsDesde").value), insHasta: incl(mzEl("mzInsHasta").value) };
 }
 function mzSetDateInputs(b){
+  // 'b' trae límites exclusivos; mostramos el último día INCLUIDO (hasta - 1) en los campos "hasta".
   mzEl("mzLiqDesde").value = b.liqDesde!=null ? serialToYMD(b.liqDesde) : "";
-  mzEl("mzLiqHasta").value = b.liqHasta!=null ? serialToYMD(b.liqHasta) : "";
+  mzEl("mzLiqHasta").value = b.liqHasta!=null ? serialToYMD(b.liqHasta-1) : "";
   mzEl("mzInsDesde").value = b.insDesde!=null ? serialToYMD(b.insDesde) : "";
-  mzEl("mzInsHasta").value = b.insHasta!=null ? serialToYMD(b.insHasta) : "";
+  mzEl("mzInsHasta").value = b.insHasta!=null ? serialToYMD(b.insHasta-1) : "";
 }
 
 function mzAfterChange(){
