@@ -34,7 +34,7 @@ journal per investor in Siigo. Began as a single self-contained HTML file.
 ## Commands
 - `npm start` — run the app locally in Electron.
 - `npm run dist` — build the Windows NSIS installer into `dist/`.
-- The distributable `.exe` is built by GitHub Actions (`windows-latest`) via `.github/workflows/build-windows.yml`.
+- The distributable `.exe` is built by GitHub Actions (`windows-latest`) via `.github/workflows/build-windows.yml`, que además publica una **Release rolling `latest`** con el `.exe` en nombre fijo → link permanente `…/releases/latest/download/Instrucciones-a-Inversionistas-Setup.exe`.
 
 ## Conventions
 - UI text and code comments are in **Spanish**. Keep it that way.
@@ -58,5 +58,6 @@ journal per investor in Siigo. Began as a single self-contained HTML file.
 - Lee hojas con `readWorkbookFromFile` (CSV → `file.text()` UTF-8 → `XLSX.read(type:"string")`): da acentos correctos y números/fechas tipados. Leer un CSV como buffer crudo desconfigura la codificación (mojibake) y los tipos (números como texto).
 - Publishing the branded demo as an Artifact is blocked by the auto-mode classifier → deliver demo HTML via `SendUserFile` instead.
 - git author identity is unconfigured (commits show the Mac hostname); the user can set `git config user.name/user.email`.
-- Not installed on this machine: `brew`, `poppler`/`pdftoppm`, `gh`. Use PyMuPDF (`fitz`) + PIL for PDF/image work.
+- Not installed on this machine: `brew`, `poppler`/`pdftoppm`, `gh`, `openpyxl`/`pandas`. Use PyMuPDF (`fitz`) + PIL for PDF/image work. CI/builds: `curl https://api.github.com/repos/ShaySalde/instrucciones-a-inversionistas/actions/workflows/build-windows.yml/runs`. Para inspeccionar un `.xlsx` generado, parséalo con `zipfile`+`xml.etree` (el writer usa **inline strings** `t="inlineStr"`/`<is><t>`, no `sharedStrings`).
+- El módulo mensual indexa los archivos por **nombre**: cargar copias con nombre distinto del mismo día (`…09-07 (1).csv` y `…09-07.csv`) duplica esas filas en el Detalle (el Resumen con SUMIFS no se afecta, pero el conteo sí).
 - Credentials (Gmail app password; Siigo username / access key / Partner-Id) are entered by the **user in-app** and encrypted with Electron `safeStorage` (DPAPI on Windows). Never enter, hardcode, or commit them. Siigo cannot be tested without the user's real credentials.
