@@ -2434,6 +2434,58 @@ function buildIndividualBlob(filtered, total, meta){
   return new Blob([outBuf], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
+// Clasifica las filas del tape (ya mapeadas a DIST_TARGETS) en inversionistas (restitución)
+// y bancos (abono a crédito). Un banco/fuente de fondeo se trata como abono a crédito tanto si
+// viene como "fuente de fondeo" como si viene de inversionista titular. Reconocemos al titular
+// (fuente de fondeo vacía) como banco cuando:
+//   (a) su NIT está en los "NITs de bancos" configurados, o
+//   (b) su NIT o su nombre aparecen como fuente de fondeo en ESTE mismo tape (auto, sin config).
+// Devuelve grp (inversionista -> filas), bankGrp (banco -> filas) y bankNitOf (banco -> NIT del titular).
+// Pura: misma salida para las mismas entradas (se prueba headless sin window.api).
+function classifyTapeRows(dat, cfg, idx){
+  const { iFuente, iNitFuente, iInvName, iNitInvDat } = idx;
+  const nitDigits = v => String(v ?? "").split("-")[0].replace(/\D/g, "");
+  const normName  = v => String(v ?? "").trim().toLowerCase();
+  const bankNitSet = new Set(((cfg && cfg.bankNits) || []).map(nitDigits).filter(Boolean));
+
+  // Pre-escaneo: NITs y nombres que aparecen como fuente de fondeo en el tape.
+  const fuenteNitSet = new Set(), fuenteNameSet = new Set();
+  for(const r of dat){
+    const fn = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
+    if(!fn) continue;
+    fuenteNameSet.add(normName(fn));
+    const fnit = iNitFuente >= 0 ? nitDigits(r[iNitFuente]) : "";
+    if(fnit) fuenteNitSet.add(fnit);
+  }
+  const titularEsBanco = (nit, name) =>
+    (!!nit  && (bankNitSet.has(nit) || fuenteNitSet.has(nit))) ||
+    (!!name && fuenteNameSet.has(normName(name)));
+
+  const grp = new Map();        // Nombre Inversionista -> filas
+  const bankGrp = new Map();    // Nombre (fuente de fondeo o banco titular) -> filas
+  const bankNitOf = new Map();  // Nombre -> NIT del banco, cuando viene del titular
+  for(const r of dat){
+    const fuente = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
+    if(fuente){
+      if(!bankGrp.has(fuente)) bankGrp.set(fuente, []);
+      bankGrp.get(fuente).push(r);
+    } else {
+      let nm = String((r[iInvName] ?? "")).trim();
+      if(!nm) nm = "(sin inversionista)";
+      const invNit = iNitInvDat >= 0 ? nitDigits(r[iNitInvDat]) : "";
+      if(titularEsBanco(invNit, nm)){
+        if(!bankGrp.has(nm)) bankGrp.set(nm, []);
+        bankGrp.get(nm).push(r);
+        if(!bankNitOf.has(nm)) bankNitOf.set(nm, String(r[iNitInvDat] ?? "").trim());
+      } else {
+        if(!grp.has(nm)) grp.set(nm, []);
+        grp.get(nm).push(r);
+      }
+    }
+  }
+  return { grp, bankGrp, bankNitOf };
+}
+
 async function runIndividual(){
   log("▶ Leyendo el libro…", "step");
   const wb = await readWorkbookFromFile(currentFile);
@@ -2454,35 +2506,12 @@ async function runIndividual(){
   const iNitInv    = INDIV_COLS.indexOf("NIT inversionista"); // índice dentro de `filtered`
   const iNitInvDat = DIST_TARGETS.indexOf("NIT inversionista"); // índice dentro de `dat`
 
-  // NITs configurados como bancos/fuentes de fondeo: si uno sale como inversionista titular
-  // (con la fuente de fondeo vacía), igual se trata como abono a crédito (banco).
-  const nitDigits = v => String(v ?? "").split("-")[0].replace(/\D/g, "");
-  const bankNitSet = new Set((SIIGO_CFG.bankNits || []).map(nitDigits).filter(Boolean));
-
   // Partición: fuente de fondeo con valor = abono a crédito (banco); vacía = restitución al
-  // inversionista, salvo que el NIT del titular sea un banco configurado (→ abono a crédito).
-  const grp = new Map();        // Nombre Inversionista -> filas
-  const bankGrp = new Map();    // Nombre (fuente de fondeo o banco titular) -> filas
-  const bankNitOf = new Map();  // Nombre -> NIT del banco, cuando viene del titular
-  for(const r of dat){
-    const fuente = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
-    if(fuente){
-      if(!bankGrp.has(fuente)) bankGrp.set(fuente, []);
-      bankGrp.get(fuente).push(r);
-    } else {
-      let nm = String((r[iInvName] ?? "")).trim();
-      if(!nm) nm = "(sin inversionista)";
-      const invNit = iNitInvDat >= 0 ? nitDigits(r[iNitInvDat]) : "";
-      if(invNit && bankNitSet.has(invNit)){
-        if(!bankGrp.has(nm)) bankGrp.set(nm, []);
-        bankGrp.get(nm).push(r);
-        if(!bankNitOf.has(nm)) bankNitOf.set(nm, String(r[iNitInvDat] ?? "").trim());
-      } else {
-        if(!grp.has(nm)) grp.set(nm, []);
-        grp.get(nm).push(r);
-      }
-    }
-  }
+  // inversionista, salvo que el titular sea un banco (NIT configurado, o NIT/nombre que ya
+  // aparece como fuente de fondeo en este tape) → también abono a crédito. Ver classifyTapeRows.
+  const { grp, bankGrp, bankNitOf } = classifyTapeRows(dat, SIIGO_CFG, {
+    iFuente, iNitFuente, iInvName, iNitInvDat
+  });
   const investors = Array.from(grp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
   const banks = Array.from(bankGrp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
   log("• Inversionistas: " + investors.length + " · Abonos a crédito (banco): " + banks.length);
