@@ -34,7 +34,8 @@ journal per investor in Siigo. Began as a single self-contained HTML file.
 ## Commands
 - `npm start` — run the app locally in Electron.
 - `npm run dist` — build the Windows NSIS installer into `dist/`.
-- The distributable `.exe` is built by GitHub Actions (`windows-latest`) via `.github/workflows/build-windows.yml`, que además publica una **Release rolling `latest`** con el `.exe` en nombre fijo → link permanente `…/releases/latest/download/Instrucciones-a-Inversionistas-Setup.exe`.
+- `npm run dist:mac` — build the macOS `.dmg` into `dist/`. `electron-builder --mac dir` genera solo el `.app`. **Sin firma de Apple** (no hay certificado) → Gatekeeper pide clic derecho → Abrir; en CI se usa `CSC_IDENTITY_AUTO_DISCOVERY=false` para no intentar firmar.
+- GitHub Actions (`.github/workflows/build-windows.yml`, conserva ese nombre de archivo) compila en **matriz Windows (`.exe`) + macOS (`.dmg` universal)** y un job `release` publica ambos en una **Release rolling `latest`** con nombre fijo → links permanentes `…/releases/latest/download/Instrucciones-a-Inversionistas-Setup.exe` y `…/Instrucciones-a-Inversionistas-mac.dmg`.
 
 ## Conventions
 - UI text and code comments are in **Spanish**. Keep it that way.
