@@ -2440,7 +2440,12 @@ function buildIndividualBlob(filtered, total, meta){
 // (fuente de fondeo vacía) como banco cuando:
 //   (a) su NIT está en los "NITs de bancos" configurados, o
 //   (b) su NIT o su nombre aparecen como fuente de fondeo en ESTE mismo tape (auto, sin config).
-// Devuelve grp (inversionista -> filas), bankGrp (banco -> filas) y bankNitOf (banco -> NIT del titular).
+// Los bancos se agrupan por **NIT (sin DV)** para que el mismo banco salga en UN solo
+// comprobante/correo aunque el nombre venga escrito distinto entre titular y fuente de fondeo.
+// Si un lado no trae NIT pero su nombre coincide con una fuente de fondeo, adopta el NIT de esa
+// fuente. Sin NIT en ningún lado, se agrupa por nombre normalizado. El nombre mostrado prefiere
+// el de la fuente de fondeo; el NIT mostrado también.
+// Devuelve grp (Nombre Inversionista -> filas) y bankGrp (bankKey -> { rows, name, nit }).
 // Pura: misma salida para las mismas entradas (se prueba headless sin window.api).
 function classifyTapeRows(dat, cfg, idx){
   const { iFuente, iNitFuente, iInvName, iNitInvDat } = idx;
@@ -2448,42 +2453,53 @@ function classifyTapeRows(dat, cfg, idx){
   const normName  = v => String(v ?? "").trim().toLowerCase();
   const bankNitSet = new Set(((cfg && cfg.bankNits) || []).map(nitDigits).filter(Boolean));
 
-  // Pre-escaneo: NITs y nombres que aparecen como fuente de fondeo en el tape.
-  const fuenteNitSet = new Set(), fuenteNameSet = new Set();
+  // Pre-escaneo de fuentes de fondeo: NITs, nombres y nombre→NIT (para que un titular sin NIT
+  // pero con nombre de fuente adopte ese NIT y caiga en el mismo grupo).
+  const fuenteNitSet = new Set(), fuenteNameSet = new Set(), fuenteNameToNit = new Map();
   for(const r of dat){
     const fn = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
     if(!fn) continue;
     fuenteNameSet.add(normName(fn));
     const fnit = iNitFuente >= 0 ? nitDigits(r[iNitFuente]) : "";
-    if(fnit) fuenteNitSet.add(fnit);
+    if(fnit){ fuenteNitSet.add(fnit); if(!fuenteNameToNit.has(normName(fn))) fuenteNameToNit.set(normName(fn), fnit); }
   }
   const titularEsBanco = (nit, name) =>
     (!!nit  && (bankNitSet.has(nit) || fuenteNitSet.has(nit))) ||
     (!!name && fuenteNameSet.has(normName(name)));
 
-  const grp = new Map();        // Nombre Inversionista -> filas
-  const bankGrp = new Map();    // Nombre (fuente de fondeo o banco titular) -> filas
-  const bankNitOf = new Map();  // Nombre -> NIT del banco, cuando viene del titular
+  const grp = new Map();      // Nombre Inversionista -> filas
+  const bankGrp = new Map();  // bankKey (NIT sin DV, o "name:"+nombre) -> { rows, name, nit }
+  // Agrega una fila a su banco. isFuente=true cuando viene como fuente de fondeo (su nombre/NIT manda).
+  const pushBank = (isFuente, rawNit, name, row) => {
+    let keyNit = nitDigits(rawNit);
+    if(!keyNit && name && fuenteNameToNit.has(normName(name))) keyNit = fuenteNameToNit.get(normName(name));
+    const key = keyNit || ("name:" + normName(name));
+    let g = bankGrp.get(key);
+    if(!g){ g = { rows: [], name, nit: rawNit || "", _fName:false, _fNit:false }; bankGrp.set(key, g); }
+    if(isFuente){ if(!g._fName){ g.name = name; g._fName = true; } }  // nombre de la fuente manda
+    else if(!g.name) g.name = name;
+    if(rawNit){ if(isFuente){ if(!g._fNit){ g.nit = rawNit; g._fNit = true; } } else if(!g.nit) g.nit = rawNit; }
+    g.rows.push(row);
+  };
+
   for(const r of dat){
     const fuente = iFuente >= 0 ? String(r[iFuente] ?? "").trim() : "";
     if(fuente){
-      if(!bankGrp.has(fuente)) bankGrp.set(fuente, []);
-      bankGrp.get(fuente).push(r);
+      pushBank(true, iNitFuente >= 0 ? String(r[iNitFuente] ?? "").trim() : "", fuente, r);
     } else {
       let nm = String((r[iInvName] ?? "")).trim();
       if(!nm) nm = "(sin inversionista)";
-      const invNit = iNitInvDat >= 0 ? nitDigits(r[iNitInvDat]) : "";
-      if(titularEsBanco(invNit, nm)){
-        if(!bankGrp.has(nm)) bankGrp.set(nm, []);
-        bankGrp.get(nm).push(r);
-        if(!bankNitOf.has(nm)) bankNitOf.set(nm, String(r[iNitInvDat] ?? "").trim());
+      const rawNit = iNitInvDat >= 0 ? String(r[iNitInvDat] ?? "").trim() : "";
+      if(titularEsBanco(nitDigits(rawNit), nm)){
+        pushBank(false, rawNit, nm, r);
       } else {
         if(!grp.has(nm)) grp.set(nm, []);
         grp.get(nm).push(r);
       }
     }
   }
-  return { grp, bankGrp, bankNitOf };
+  for(const g of bankGrp.values()){ delete g._fName; delete g._fNit; }  // limpia flags internos
+  return { grp, bankGrp };
 }
 
 async function runIndividual(){
@@ -2509,11 +2525,11 @@ async function runIndividual(){
   // Partición: fuente de fondeo con valor = abono a crédito (banco); vacía = restitución al
   // inversionista, salvo que el titular sea un banco (NIT configurado, o NIT/nombre que ya
   // aparece como fuente de fondeo en este tape) → también abono a crédito. Ver classifyTapeRows.
-  const { grp, bankGrp, bankNitOf } = classifyTapeRows(dat, SIIGO_CFG, {
+  const { grp, bankGrp } = classifyTapeRows(dat, SIIGO_CFG, {
     iFuente, iNitFuente, iInvName, iNitInvDat
   });
   const investors = Array.from(grp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
-  const banks = Array.from(bankGrp.keys()).sort((a,b) => a.localeCompare(b, "es", { sensitivity:"base" }));
+  const banks = Array.from(bankGrp.values()).sort((a,b) => (a.name||"").localeCompare(b.name||"", "es", { sensitivity:"base" }));
   log("• Inversionistas: " + investors.length + " · Abonos a crédito (banco): " + banks.length);
 
   individualResults = [];
@@ -2539,15 +2555,10 @@ async function runIndividual(){
     individualResults.push({ kind:"investor", name: nm, nit, count: rows.length, total, blob, fileName, filtered, alerts });
     log("• " + nm + ": " + rows.length + " operación(es) · " + fmtCOP(total));
   }
-  // --- Banco (abono a crédito financiero) — agrupado por No Operación ---
-  for(const fuente of banks){
-    const rows = bankGrp.get(fuente);
-    let fuenteNit = "";
-    for(const r of rows){
-      const v = iNitFuente >= 0 ? r[iNitFuente] : null;
-      if(v != null && String(v).trim() !== ""){ fuenteNit = String(v).trim(); break; }
-    }
-    if(!fuenteNit) fuenteNit = bankNitOf.get(fuente) || "";  // banco que vino como inversionista titular
+  // --- Banco (abono a crédito financiero) — agrupado por NIT; operaciones por No Operación ---
+  for(const g of banks){
+    const rows = g.rows;
+    const fuenteNit = g.nit || "";
     const opMap = new Map(); // No Operación -> { noOp, valor }
     let total = 0;
     for(const r of rows){
@@ -2560,8 +2571,8 @@ async function runIndividual(){
       total += vp;
     }
     const ops = Array.from(opMap.values());
-    individualResults.push({ kind:"bank", name: fuente, nit: fuenteNit, count: ops.length, total, ops, obligByOp: {} });
-    log("• [Abono a crédito] " + fuente + ": " + ops.length + " operación(es) · " + fmtCOP(total));
+    individualResults.push({ kind:"bank", name: g.name, nit: fuenteNit, count: ops.length, total, ops, obligByOp: {} });
+    log("• [Abono a crédito] " + g.name + ": " + ops.length + " operación(es) · " + fmtCOP(total));
   }
 
   await renderIndividualResults(true);
